@@ -18,7 +18,7 @@ class RasdApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       //home: const HomeScreen(),
       //home: const PalmListPage(),
-      home: const FarmMapPage(),
+      //home: const FarmMapPage(),
     );
   }
 }
