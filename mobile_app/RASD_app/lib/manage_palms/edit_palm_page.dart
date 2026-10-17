@@ -20,18 +20,20 @@ class _EditPalmPageState extends State<EditPalmPage> {
   late final TextEditingController _idController;
   late final TextEditingController _ageController;
   late final TextEditingController _notesController;
-  late String _type;
+  String? _type;
   late String _status;
 
   @override
   void initState() {
     super.initState();
     final palm = widget.palm;
-    _idController = TextEditingController(text: palm.id);
-    _ageController = TextEditingController(text: '${palm.age}');
+    // The user edits the number only; "P" is added by the system.
+    _idController =
+        TextEditingController(text: PalmStore.numberFromPalmId(palm.id));
+    _ageController = TextEditingController(text: '${palm.age ?? ''}');
     _notesController = TextEditingController(text: palm.notes);
     _type = palm.type;
-    _status = palm.status;
+    _status = palm.statusLabel;
   }
 
   @override
@@ -45,7 +47,8 @@ class _EditPalmPageState extends State<EditPalmPage> {
   String? _validateId(String? value) {
     final error = PalmValidators.palmId(value);
     if (error != null) return error;
-    if (_store.idExists(value!, except: widget.palm)) {
+    if (_store.idExists(PalmStore.palmIdFromNumber(value!),
+        except: widget.palm)) {
       return 'This tree ID already exists in this farm.';
     }
     return null;
@@ -54,10 +57,10 @@ class _EditPalmPageState extends State<EditPalmPage> {
   /// True if the user changed at least one field.
   bool get _hasChanges {
     final palm = widget.palm;
-    return _idController.text.trim() != palm.id ||
-        _ageController.text.trim() != '${palm.age}' ||
+    return PalmStore.palmIdFromNumber(_idController.text) != palm.id ||
+        _ageController.text.trim() != '${palm.age ?? ''}' ||
         _type != palm.type ||
-        _status != palm.status ||
+        _status != palm.statusLabel ||
         _notesController.text.trim() != palm.notes;
   }
 
@@ -75,9 +78,9 @@ class _EditPalmPageState extends State<EditPalmPage> {
 
     _store.updatePalm(
       widget.palm,
-      id: _idController.text,
+      id: PalmStore.palmIdFromNumber(_idController.text),
       age: int.parse(_ageController.text.trim()),
-      type: _type,
+      type: _type!,
       status: _status,
       notes: _notesController.text,
     );
@@ -111,7 +114,8 @@ class _EditPalmPageState extends State<EditPalmPage> {
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         decoration: const InputDecoration(
                           prefixIcon: Icon(Icons.tag),
-                          helperText: '4 digits, e.g. 0007',
+                          prefixText: 'P',
+                          helperText: '3 digits, e.g. 008',
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -127,11 +131,13 @@ class _EditPalmPageState extends State<EditPalmPage> {
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         initialValue: _type,
+                        hint: const Text('Select palm type'),
                         items: _withCurrent(PalmStore.palmTypes, _type)
                             .map((t) =>
                                 DropdownMenuItem(value: t, child: Text(t)))
                             .toList(),
-                        onChanged: (v) => setState(() => _type = v!),
+                        validator: PalmValidators.required,
+                        onChanged: (v) => setState(() => _type = v),
                       ),
                       const SizedBox(height: 18),
                       Text('Status', style: labelStyle),
@@ -187,7 +193,8 @@ class _EditPalmPageState extends State<EditPalmPage> {
   }
 
   /// Makes sure the current value is in the list (avoids a dropdown crash).
-  List<String> _withCurrent(List<String> options, String current) {
-    return options.contains(current) ? options : [...options, current];
+  List<String> _withCurrent(List<String> options, String? current) {
+    if (current == null || options.contains(current)) return options;
+    return [...options, current];
   }
 }

@@ -67,16 +67,17 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
         ? widget.longitude
         : double.parse(_lngController.text.trim());
 
-    _store.addPalm(Palm(
+    // Saved in the team's shared data (MockData).
+    _store.addPalm(
       id: widget.palmId,
       age: widget.age,
       type: widget.type,
       latitude: widget.latitude,
       longitude: widget.longitude,
-      deviceId: PalmStore.deviceIdFromNumber(_deviceController.text),
+      deviceNumber: _deviceController.text,
       sensorLatitude: sensorLat,
       sensorLongitude: sensorLng,
-    ));
+    );
 
     Navigator.pop(context, true);
   }
@@ -110,7 +111,7 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                       TextFormField(
                         controller: _deviceController,
                         // The user types the number only; the system
-                        // adds "RASD-" and the zeros (5 -> RASD-00005).
+                        // adds "D" and the zeros (8 -> D008).
                         // Letters can be typed, but an error message appears.
                         onChanged: (value) {
                           setState(() {
@@ -121,9 +122,9 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'e.g. 5',
+                          hintText: 'e.g. 8',
                           prefixIcon: const Icon(Icons.sensors_rounded),
-                          prefixText: 'RASD-',
+                          prefixText: 'D',
                           helperText: 'Enter the number on the sensor',
                           errorText: _deviceError,
                         ),
@@ -219,7 +220,7 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Linked to Palm #${widget.palmId}',
+                Text('Linked to palm ${widget.palmId}',
                     style: Theme.of(context).textTheme.titleSmall),
                 Text(
                   '${widget.type} · ${widget.age} yrs',

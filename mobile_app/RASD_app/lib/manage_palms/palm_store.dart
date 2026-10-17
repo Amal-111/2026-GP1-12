@@ -1,62 +1,45 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../data/mock_data.dart';
 
-/// One palm tree in the farm.
-class Palm {
-  String id;
-  int age;
-  String type;
-  String status;
-  String notes;
-  double latitude;
-  double longitude;
-  String deviceId;
-  double sensorLatitude;
-  double sensorLongitude;
-  String updated;
+/// The Manage Palms pages use the team's shared data (MockData), so a palm
+/// added, edited or deleted here also changes in Home, the palm list,
+/// the map and the alerts.
+typedef Palm = PalmData;
 
-  Palm({
-    required this.id,
-    required this.age,
-    required this.type,
-    required this.latitude,
-    required this.longitude,
-    required this.deviceId,
-    required this.sensorLatitude,
-    required this.sensorLongitude,
-    this.status = 'Healthy',
-    this.notes = '',
-    this.updated = 'Just now',
-  });
+/// Extra helpers for the Manage Palms pages.
+extension PalmInfo on PalmData {
+  double get latitude => _part(location, 0);
+  double get longitude => _part(location, 1);
+
+  /// 'Healthy', 'Suspected' or 'Under Monitoring'.
+  String get statusLabel => palmStatusLabel(status);
+
+  static double _part(String text, int index) {
+    final parts = text.split(',');
+    if (parts.length != 2) return 0;
+    return double.tryParse(parts[index].trim()) ?? 0;
+  }
 }
 
-/// Keeps the farm's palms in memory and shares them between pages.
-///
-/// TODO: when the team adds a database (e.g. Firebase), replace the
-/// lists below with database calls. The pages do not need to change.
-class PalmStore extends ChangeNotifier {
+class PalmStore {
   PalmStore._();
   static final PalmStore instance = PalmStore._();
 
-  final List<Palm> _palms = [
-    Palm(id: '0001', age: 12, type: 'Sukkari', status: 'Healthy',
-        latitude: 24.7136, longitude: 46.6753, deviceId: 'RASD-00001',
-        sensorLatitude: 24.7136, sensorLongitude: 46.6753,
-        updated: '5 min ago'),
-    Palm(id: '0002', age: 8, type: 'Khalas', status: 'Suspected',
-        latitude: 24.7140, longitude: 46.6760, deviceId: 'RASD-00002',
-        sensorLatitude: 24.7140, sensorLongitude: 46.6760,
-        updated: '10 min ago'),
-    Palm(id: '0003', age: 15, type: 'Ajwa', status: 'Monitoring',
-        latitude: 24.7145, longitude: 46.6748, deviceId: 'RASD-00003',
-        sensorLatitude: 24.7145, sensorLongitude: 46.6748,
-        updated: '1 hour ago'),
-  ];
+  /// Pages listen to this to refresh when the data changes.
+  Listenable get changes => MockData.changes;
 
-  /// Sensors that exist in the system (sample data).
-  /// TODO: replace with the real devices from the database.
-  final Set<String> _registeredDevices = {
-    for (int i = 1; i <= 20; i++) 'RASD-${i.toString().padLeft(5, '0')}',
-  };
+  /// The farm the user works on (null = not assigned to any farm).
+  String? get activeFarmId {
+    final user = MockData.currentUser;
+    if (user.role == UserRole.farmer) return user.farmId;
+    return MockData.selectedFarmId;
+  }
+
+  List<PalmData> get palms {
+    final farmId = activeFarmId;
+    if (farmId == null || farmId.isEmpty) return [];
+    return MockData.palmsForFarm(farmId);
+  }
 
   static const List<String> palmTypes = [
     'Sukkari',
@@ -71,81 +54,102 @@ class PalmStore extends ChangeNotifier {
   static const List<String> statuses = [
     'Healthy',
     'Suspected',
-    'Monitoring',
-    'Treated',
+    'Under Monitoring',
   ];
 
-  List<Palm> get palms => List.unmodifiable(_palms);
+  static PalmStatus statusFromLabel(String label) => switch (label) {
+        'Suspected' => PalmStatus.suspected,
+        'Under Monitoring' => PalmStatus.underMonitoring,
+        _ => PalmStatus.healthy,
+      };
 
-  /// Next palm ID, given automatically by the system
-  /// (biggest existing number + 1, so it never repeats).
-  String nextPalmId() {
-    int maxId = 0;
-    for (final palm in _palms) {
-      final n = int.tryParse(palm.id) ?? 0;
-      if (n > maxId) maxId = n;
-    }
-    return (maxId + 1).toString().padLeft(4, '0');
-  }
+  /// Next palm ID given by the system (P008, P009...).
+  String nextPalmId() => MockData.nextPalmId();
 
-  bool idExists(String id, {Palm? except}) {
-    return _palms.any((p) => p.id == id.trim() && p != except);
-  }
-
-  /// Returns an error message, or null if the device can be used.
-  /// Turns the number the user typed into the full sensor ID:
-  /// "5" -> "RASD-00005".
-  static String deviceIdFromNumber(String number) {
-    final n = int.tryParse(number.trim()) ?? 0;
-    return 'RASD-${n.toString().padLeft(5, '0')}';
+  bool idExists(String id, {PalmData? except}) {
+    return MockData.palms.any((p) => p.id == id.trim() && p != except);
   }
 
   static bool isDigits(String value) => RegExp(r'^\d+$').hasMatch(value.trim());
 
-  /// [number] is what the user typed.
+  static String _pad(String number) =>
+      (int.tryParse(number.trim()) ?? 0).toString().padLeft(3, '0');
+
+  /// What the user typed -> full palm ID: "8" -> "P008".
+  static String palmIdFromNumber(String number) => 'P${_pad(number)}';
+
+  /// The number part of a palm ID: "P008" -> "008".
+  static String numberFromPalmId(String id) =>
+      id.replaceAll(RegExp(r'[^0-9]'), '');
+
+  /// What the user typed -> full sensor ID: "8" -> "D008".
+  static String deviceIdFromNumber(String number) => 'D${_pad(number)}';
+
+  /// [number] is what the user typed. Returns an error message, or null
+  /// if the sensor can be connected.
   String? checkDevice(String number) {
     if (number.trim().isEmpty) return 'Device ID is required.';
     if (!isDigits(number)) return 'Device ID must be a number.';
     final id = deviceIdFromNumber(number);
-    if (!_registeredDevices.contains(id)) {
+    if (!MockData.devices.contains(id)) {
       return 'Device not found. Please check the device ID.';
     }
-    if (_palms.any((p) => p.deviceId == id)) {
+    if (MockData.palms.any((p) => p.deviceId == id)) {
       return 'This device is already connected to another palm.';
     }
     return null;
   }
 
-  void addPalm(Palm palm) {
-    palm.deviceId = palm.deviceId.trim().toUpperCase();
-    _palms.add(palm);
-    notifyListeners();
+  void addPalm({
+    required String id,
+    required int age,
+    required String type,
+    required double latitude,
+    required double longitude,
+    required String deviceNumber,
+    required double sensorLatitude,
+    required double sensorLongitude,
+  }) {
+    final now = DateTime.now();
+    MockData.addPalm(PalmData(
+      id: id,
+      farmId: activeFarmId ?? MockData.selectedFarmId,
+      name: id,
+      status: PalmStatus.healthy,
+      // No readings yet: the sensor will send them.
+      temperature: 0,
+      humidity: 0,
+      location: '$latitude, $longitude',
+      sensorLocation: '$sensorLatitude, $sensorLongitude',
+      updatedAt: now,
+      deviceId: deviceIdFromNumber(deviceNumber),
+      deviceOnline: true,
+      lastSeen: now,
+      age: age,
+      type: type,
+    ));
   }
 
-  void updatePalm(Palm palm, {
+  void updatePalm(
+    PalmData palm, {
     required String id,
     required int age,
     required String type,
     required String status,
     required String notes,
   }) {
-    palm
-      ..id = id.trim()
-      ..age = age
-      ..type = type
-      ..status = status
-      ..notes = notes.trim()
-      ..updated = 'Just now';
-    notifyListeners();
+    MockData.updatePalm(
+      palm,
+      id: id.trim(),
+      age: age,
+      type: type,
+      status: statusFromLabel(status),
+      notes: notes.trim(),
+    );
   }
 
-  /// Deletes the palm and everything related to it.
-  /// TODO: when there is a database, also delete its care history and
-  /// health records here.
-  void deletePalm(Palm palm) {
-    _palms.remove(palm);
-    notifyListeners();
-  }
+  /// Deletes the palm with its alerts and treatment history.
+  void deletePalm(PalmData palm) => MockData.deletePalm(palm);
 }
 
 /// Shared form checks, so every page shows the same messages.
@@ -157,15 +161,13 @@ class PalmValidators {
     return null;
   }
 
-  /// Palm ID rules: required, exactly 4 digits, not 0000.
+  /// Palm ID number (the part after "P"): required, 3 digits, not 000.
   static String? palmId(String? value) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'This field is required.';
-    if (!RegExp(r'^\d+$').hasMatch(v)) {
-      return 'Palm ID must be a number.';
-    }
-    if (!RegExp(r'^\d{4}$').hasMatch(v) || v == '0000') {
-      return 'Palm ID must be 4 digits (e.g. 0007).';
+    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Palm ID must be a number.';
+    if (!RegExp(r'^\d{3}$').hasMatch(v) || v == '000') {
+      return 'Palm ID must be 3 digits (e.g. 008).';
     }
     return null;
   }

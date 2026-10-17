@@ -28,9 +28,8 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     final query = _searchController.text.trim().toLowerCase();
     return _store.palms.where((palm) {
       return query.isEmpty ||
-          palm.id.contains(query) ||
-          'palm #${palm.id}'.contains(query) ||
-          palm.type.toLowerCase().contains(query);
+          palm.id.toLowerCase().contains(query) ||
+          (palm.type ?? '').toLowerCase().contains(query);
     }).toList();
   }
 
@@ -39,6 +38,15 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
   }
 
   Future<void> _openAddPalm() async {
+    // A farm owner who is not assigned to any farm cannot add palms.
+    if (_store.activeFarmId == null || _store.activeFarmId!.isEmpty) {
+      showCenterMessage(
+        context,
+        'You are not assigned to any farm yet.',
+        success: false,
+      );
+      return;
+    }
     final added = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const AddPalmPage()),
@@ -62,7 +70,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete Palm #${palm.id}?'),
+        title: Text('Delete ${palm.id}?'),
         content: const Text(
           'Are you sure you want to delete this palm tree? '
           'This action cannot be undone.',
@@ -93,7 +101,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
         return AppColors.healthy;
       case 'Suspected':
         return AppColors.suspected;
-      case 'Monitoring':
+      case 'Under Monitoring':
         return AppColors.monitoring;
       case 'Treated':
         return AppColors.treated;
@@ -106,7 +114,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     switch (status) {
       case 'Suspected':
         return Icons.warning_rounded;
-      case 'Monitoring':
+      case 'Under Monitoring':
         return Icons.access_time_rounded;
       case 'Treated':
         return Icons.medical_services_rounded;
@@ -123,7 +131,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
       ),
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: _store,
+          listenable: _store.changes,
           builder: (context, _) {
             final palms = _filteredPalms;
             return Column(
@@ -179,7 +187,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
   }
 
   Widget _buildPalmCard(Palm palm) {
-    final color = _statusColor(palm.status);
+    final color = _statusColor(palm.statusLabel);
 
     return GlassBox(
       padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
@@ -192,17 +200,17 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                 color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: appIcon(_statusIcon(palm.status), color: color, size: 30),
+              child: appIcon(_statusIcon(palm.statusLabel), color: color, size: 30),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Palm #${palm.id}',
+                  Text(palm.id,
                       style: Theme.of(context).textTheme.titleMedium),
                   Text(
-                    palm.status,
+                    palm.statusLabel,
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 14,
@@ -211,7 +219,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                     ),
                   ),
                   Text(
-                    '${palm.type} · ${palm.age} yrs · ${palm.deviceId}',
+                    '${palm.type ?? '-'} · ${palm.age == null ? '-' : '${palm.age} yrs'} · ${palm.deviceId}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
