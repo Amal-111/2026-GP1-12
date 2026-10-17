@@ -1,10 +1,16 @@
-
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/glass_widgets.dart';
 import '../list/palm_details.dart';
 import '../data/mock_data.dart';
+import 'map_tiles.dart';
 
+/// Farm map: real map (satellite or street) with a marker for each palm.
+/// Tap a marker to see the palm and open its details.
 class FarmMapPage extends StatefulWidget {
   const FarmMapPage({super.key, this.farmId, this.highlightedPalmId});
   final String? highlightedPalmId;
@@ -15,7 +21,9 @@ class FarmMapPage extends StatefulWidget {
 }
 
 class _FarmMapPageState extends State<FarmMapPage> {
-  DemoPalm? selectedPalm;
+  final MapController _mapController = MapController();
+  MapPalm? selectedPalm;
+  bool _satellite = true;
 
   @override
   void initState() {
@@ -30,14 +38,16 @@ class _FarmMapPageState extends State<FarmMapPage> {
       }
     }
   }
-// need edit
+
   void _refresh() {
-    if (mounted) setState(() {
-      if (selectedPalm != null) {
-        final matches = palms.where((p) => p.id == selectedPalm!.id);
-        selectedPalm = matches.isEmpty ? null : matches.first;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (selectedPalm != null) {
+          final matches = palms.where((p) => p.id == selectedPalm!.id);
+          selectedPalm = matches.isEmpty ? null : matches.first;
+        }
+      });
+    }
   }
 
   @override
@@ -46,31 +56,41 @@ class _FarmMapPageState extends State<FarmMapPage> {
     super.dispose();
   }
 
-
   String get activeFarmId => MockData.currentUser.role == UserRole.farmer
       ? (MockData.currentUser.farmId ?? '')
       : (widget.farmId ?? MockData.selectedFarmId);
 
-  List<DemoPalm> get palms {
+  /// Palms of the farm with their real location from MockData.
+  List<MapPalm> get palms {
     final data = MockData.palmsForFarm(activeFarmId);
-    const positions = [
-      [0.12, 0.12], [0.53, 0.17], [0.80, 0.30],
-      [0.22, 0.40], [0.63, 0.51], [0.22, 0.72], [0.74, 0.79],
-    ];
-    return List.generate(data.length, (i) {
-      final palm = data[i];
-      final position = positions[i % positions.length];
-      return DemoPalm(
+    final used = <String, int>{};
+    final result = <MapPalm>[];
+
+    for (final palm in data) {
+      final point = RasdMap.parse(palm.location);
+      if (point == null) continue;
+
+      // Two palms with the exact same location: move the second one a
+      // little so both markers can be tapped.
+      final key = palm.location.trim();
+      final repeat = used[key] ?? 0;
+      used[key] = repeat + 1;
+
+      result.add(MapPalm(
         id: palm.id,
-        status: !palm.deviceOnline ? 'Offline' :
-        palm.status == PalmStatus.underMonitoring ? 'Monitoring' :
-        palmStatusLabel(palm.status),
-        x: position[0], y: position[1],
-      );
-    });
+        status: !palm.deviceOnline
+            ? 'Offline'
+            : palm.status == PalmStatus.underMonitoring
+                ? 'Monitoring'
+                : palmStatusLabel(palm.status),
+        point: LatLng(
+          point.latitude + repeat * 0.00004,
+          point.longitude + repeat * 0.00004,
+        ),
+      ));
+    }
+    return result;
   }
-
-
 
   Color statusColor(String status) {
     switch (status) {
@@ -87,155 +107,158 @@ class _FarmMapPageState extends State<FarmMapPage> {
     }
   }
 
-  void openPalmDetails(DemoPalm palm) {
+  void openPalmDetails(MapPalm palm) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PalmDetailsPage(
-          palmId: palm.id,
-        ),
+        builder: (_) => PalmDetailsPage(palmId: palm.id),
       ),
     );
   }
 
+  /// Moves the map so all palms of the farm can be seen.
+  void _showWholeFarm(List<MapPalm> list) {
+    if (list.isEmpty) {
+      _mapController.move(RasdMap.farmCenter, 17);
+    } else if (list.length == 1) {
+      _mapController.move(list.first.point, 18);
+    } else {
+      _mapController.fitCamera(CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(list.map((p) => p.point).toList()),
+        padding: const EdgeInsets.all(70),
+        maxZoom: 18,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final list = palms;
+    final farmName = MockData.farms.any((f) => f.id == activeFarmId)
+        ? MockData.farms.firstWhere((f) => f.id == activeFarmId).name
+        : 'Farm Map';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: Text(MockData.farms.any((f) => f.id == activeFarmId) ? MockData.farms.firstWhere((f) => f.id == activeFarmId).name : 'Farm Map'),
-        actions: [
-          IconButton(
-            tooltip: 'Map layers',
-            icon: const Icon(Icons.layers_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Map layers are for future implementation.',
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
+        title: Text(farmName),
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final mapWidth = constraints.maxWidth;
-                final mapHeight = constraints.maxHeight;
-
-                return Stack(
-                  fit: StackFit.expand,
+            child: Stack(
+              children: [
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: selectedPalm?.point ??
+                        (list.isEmpty ? RasdMap.farmCenter : list.first.point),
+                    initialZoom: 17,
+                    initialCameraFit: selectedPalm == null && list.length > 1
+                        ? CameraFit.bounds(
+                            bounds: LatLngBounds.fromPoints(
+                                list.map((p) => p.point).toList()),
+                            padding: const EdgeInsets.all(70),
+                            maxZoom: 18,
+                          )
+                        : null,
+                    minZoom: 3,
+                    maxZoom: 19,
+                    // Tap on an empty place closes the palm card.
+                    onTap: (_, __) => setState(() => selectedPalm = null),
+                  ),
                   children: [
-                    // Static demo image of the palm farm.
-                    Image.asset(
-                      'assets/images/farm_map.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.beige,
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.all(20),
-                          child: const Text(
-                            'Farm image not found.\n'
-                                'Check assets/images/farm_map.jpg',
-                            textAlign: TextAlign.center,
+                    RasdMap.tiles(satellite: _satellite),
+                    MarkerLayer(
+                      markers: list.map((palm) {
+                        final selected = selectedPalm?.id == palm.id;
+                        return Marker(
+                          point: palm.point,
+                          width: 60,
+                          height: 66,
+                          alignment: Alignment.topCenter,
+                          child: GestureDetector(
+                            onTap: () => setState(() => selectedPalm = palm),
+                            child: _PalmMarker(
+                              color: statusColor(palm.status),
+                              selected: selected,
+                            ),
                           ),
                         );
-                      },
+                      }).toList(),
                     ),
-
-                    // Interactive palm markers.
-                    ...palms.map((palm) {
-                      return Positioned(
-                        left: mapWidth * palm.x - 25,
-                        top: mapHeight * palm.y - 29,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              selectedPalm = palm;
-                            });
-                          },
-                          child: _PalmMarker(
-                            color: statusColor(palm.status),
-                            selected: selectedPalm?.id == palm.id,
-                          ),
-                        ),
-                      );
-                    }),
-
-                    // Selected palm information.
-                    if (selectedPalm != null)
-                      Positioned(
-                        left: 14,
-                        right: 14,
-                        top: mapHeight * 0.30,
-                        child: _PalmInfoCard(
-                          palm: selectedPalm!,
-                          color: statusColor(selectedPalm!.status),
-                          onClose: () {
-                            setState(() {
-                              selectedPalm = null;
-                            });
-                          },
-                          onViewDetails: () {
-                            openPalmDetails(selectedPalm!);
-                          },
-                        ),
-                      ),
-
-                    // Demo current-location button.
-                    Positioned(
-                      right: 16,
-                      bottom: 94,
-                      child: Material(
-                        color: Colors.white,
-                        elevation: 4,
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          tooltip: 'My location',
-                          iconSize: 30,
-                          padding: const EdgeInsets.all(16),
-                          icon: const Icon(
-                            Icons.my_location_rounded,
-                            color: AppColors.primary,
-                          ),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Current location is not connected '
-                                      'in the demo map.',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-
-                    // Status legend.
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 10,
-                      child: _StatusLegend(
-                        getColor: statusColor,
-                      ),
-                    ),
+                    RasdMap.attribution(satellite: _satellite),
                   ],
-                );
-              },
+                ),
+
+                // Map buttons.
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Column(
+                    children: [
+                      MapRoundButton(
+                        icon: _satellite
+                            ? Icons.map_outlined
+                            : Icons.satellite_alt,
+                        tooltip: _satellite ? 'Street map' : 'Satellite',
+                        onTap: () => setState(() => _satellite = !_satellite),
+                      ),
+                      const SizedBox(height: 8),
+                      MapRoundButton(
+                        icon: Icons.add,
+                        tooltip: 'Zoom in',
+                        onTap: () => _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom + 1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      MapRoundButton(
+                        icon: Icons.remove,
+                        tooltip: 'Zoom out',
+                        onTap: () => _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom - 1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      MapRoundButton(
+                        icon: Icons.center_focus_strong,
+                        tooltip: 'Show whole farm',
+                        onTap: () => _showWholeFarm(list),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Selected palm information.
+                if (selectedPalm != null)
+                  Positioned(
+                    left: 14,
+                    right: 70,
+                    top: 12,
+                    child: _PalmInfoCard(
+                      palm: selectedPalm!,
+                      color: statusColor(selectedPalm!.status),
+                      onClose: () => setState(() => selectedPalm = null),
+                      onViewDetails: () => openPalmDetails(selectedPalm!),
+                    ),
+                  ),
+
+                // Status legend.
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 28,
+                  child: _StatusLegend(getColor: statusColor),
+                ),
+              ],
             ),
           ),
         ),
@@ -244,18 +267,16 @@ class _FarmMapPageState extends State<FarmMapPage> {
   }
 }
 
-// Demo palm information and marker positions.
-class DemoPalm {
+/// A palm shown on the map.
+class MapPalm {
   final String id;
   final String status;
-  final double x;
-  final double y;
+  final LatLng point;
 
-  const DemoPalm({
+  const MapPalm({
     required this.id,
     required this.status,
-    required this.x,
-    required this.y,
+    required this.point,
   });
 }
 
@@ -271,39 +292,33 @@ class _PalmMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 52,
-      height: 60,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(
-            Icons.location_on,
-            size: selected ? 59 : 53,
-            color: Colors.white,
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Icon(
+          Icons.location_on,
+          size: selected ? 62 : 54,
+          color: Colors.white,
+        ),
+        Icon(
+          Icons.location_on,
+          size: selected ? 56 : 48,
+          color: color,
+        ),
+        Positioned(
+          top: selected ? 10 : 12,
+          child: const PalmIcon(color: Colors.white,
+            size: 22,
           ),
-          Icon(
-            Icons.location_on,
-            size: selected ? 53 : 47,
-            color: color,
-          ),
-          const Positioned(
-            top: 7,
-            child: Icon(
-              Icons.park_rounded,
-              color: Colors.white,
-              size: 23,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
 // Information popup shown after tapping a marker.
 class _PalmInfoCard extends StatelessWidget {
-  final DemoPalm palm;
+  final MapPalm palm;
   final Color color;
   final VoidCallback onClose;
   final VoidCallback onViewDetails;
@@ -317,106 +332,55 @@ class _PalmInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      elevation: 8,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.park_rounded,
-                    color: color,
-                    size: 28,
-                  ),
+    return GlassBox(
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    palm.id,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    palm.status,
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: color,
+                child: PalmIcon(color: color, size: 26),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      palm.id,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                  ),
+                    Text(
+                      palm.status,
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: onClose,
-                  tooltip: 'Close',
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                const Text(
-                  'Palm ID',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  palm.id,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text(
-                  'Status',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  palm.status,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
+              ),
+              IconButton(
+                onPressed: onClose,
+                tooltip: 'Close',
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onViewDetails,
@@ -424,14 +388,14 @@ class _PalmInfoCard extends StatelessWidget {
                 label: const Text('View Palm Details'),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// Legend for the five palm statuses.
+// Legend for the palm statuses.
 class _StatusLegend extends StatelessWidget {
   final Color Function(String) getColor;
 
@@ -448,22 +412,8 @@ class _StatusLegend extends StatelessWidget {
       'Offline',
     ];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 14,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return GlassBox(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(

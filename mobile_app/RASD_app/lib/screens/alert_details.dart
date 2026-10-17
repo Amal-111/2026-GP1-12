@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
+import '../theme/glass_widgets.dart';
 import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import 'alerts.dart';
@@ -42,12 +44,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Alert summary
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            GlassBox(
               child: Row(
                 children: [
                   Icon(alertTypeIcon(alert.type), color: color, size: 42),
@@ -73,7 +70,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
             const SizedBox(height: 16),
 
             // Palm image and location
-            Card(
+            GlassCard(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -91,7 +88,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                             width: 100,
                             height: 135,
                             color: const Color(0xFFE1EFE4),
-                            child: const Icon(Icons.park, color: AppColors.primary, size: 50),
+                            child: const PalmIcon(color: AppColors.primary, size: 50),
                           );
                         },
                       ),
@@ -122,7 +119,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                             },
                           ),
                           TextButton.icon(
-                            icon: const Icon(Icons.park),
+                            icon: const PalmIcon(),
                             label: const Text('Palm Details'),
                             onPressed: palm == null
                                 ? null
@@ -143,12 +140,8 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
             const SizedBox(height: 12),
 
             // Recommended action box
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF6E4),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            GlassBox(
+              tint: const Color(0xFFFFF6E4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -168,9 +161,16 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Alert Message', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            const SizedBox(height: 5),
-            Text(alert.message),
+            GlassBox(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Alert Message', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  const SizedBox(height: 5),
+                  Text(alert.message),
+                ],
+              ),
+            ),
           ],
         ),
       ),

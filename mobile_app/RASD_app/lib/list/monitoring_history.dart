@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import '../data/mock_data.dart';
 
@@ -41,6 +42,7 @@ class MonitoringHistoryPage extends StatelessWidget {
                 20,
                 16,
               ),
+              child: GlassLabel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -62,11 +64,12 @@ class MonitoringHistoryPage extends StatelessWidget {
                   ),
                 ],
               ),
+              ),
             ),
 
             Expanded(
               child: _sampleRecords.isEmpty
-                  ? const Center(child: Text('No monitoring events yet.'))
+                  ? const Center(child: GlassLabel(child: Text('No monitoring events yet.')))
                   : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
                   20,
@@ -86,7 +89,7 @@ class MonitoringHistoryPage extends StatelessWidget {
                       ? AppColors.suspected
                       : AppColors.healthy;
 
-                  return Card(
+                  return GlassCard(
                     margin: EdgeInsets.zero,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
@@ -209,7 +212,7 @@ class MonitoringRecordDetailsPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
+              GlassCard(
                 margin: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(20),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
 import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import '../list/palm_list.dart';
@@ -6,6 +7,7 @@ import '../map/palm_map.dart';
 import '../list/palm_details.dart';
 import 'alerts.dart';
 import 'alert_details.dart';
+import '../theme/glass_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -158,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: currentPage,
       bottomNavigationBar: NavigationBar(
         height: 78,
@@ -171,8 +172,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.park_outlined),
-            selectedIcon: Icon(Icons.park),
+            icon: PalmIcon(),
+            selectedIcon: PalmIcon(),
             label: 'Palms',
           ),
           NavigationDestination(
@@ -198,7 +199,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _ProfilPage(String title, IconData icon) {
     return SafeArea(
       child: Center(
+        child: GlassBox(
+        padding: const EdgeInsets.all(28),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 75, color: AppColors.secondary),
@@ -210,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -220,21 +225,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Stack(
       children: [
-        // Background
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/palm_background.jpg',
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const ColoredBox(color: AppColors.background);
-            },
-          ),
-        ),
-        Positioned.fill(
-          child: Container(
-            color: Colors.white.withValues(alpha: 0.78),
-          ),
-        ),
+        // The palm background now comes from the app theme
+        // (same for every page).
 
         SafeArea(
           child: SingleChildScrollView(
@@ -242,6 +234,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Greeting and farm name
+                GlassBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 Row(
                   children: [
                     if (MockData.currentUser.role == UserRole.farmOwner) ...[
@@ -269,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     CircleAvatar(
                       radius: 23,
-                      backgroundColor: AppColors.beige,
+                      backgroundColor: Colors.white.withValues(alpha: 0.6),
                       child: IconButton(
                         icon: const Icon(Icons.person, color: AppColors.primary),
                         onPressed: () => selectTab(4),
@@ -301,18 +298,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                  ],
                 ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 22),
 
-                Container(
-                  width: double.infinity,
+                GlassBox(
                   padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F3EA),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
+                  radius: 18,
+                  tint: const Color(0xFFE8F3EA),
                   child: Row(
                     children: [
-                      const Icon(Icons.forest, size: 40, color: AppColors.primary),
+                      const PalmIcon(size: 40, color: AppColors.primary),
                       const SizedBox(width: 14),
                       const Expanded(
                         child: Text(
@@ -374,9 +371,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Material(
-                        color: const Color(0xFFF0F2F3),
-                        borderRadius: BorderRadius.circular(20),
+                      child: GlassBox(
+                        padding: EdgeInsets.zero,
+                        radius: 20,
+                        tint: const Color(0xFFF0F2F3),
+                        child: Material(
+                        type: MaterialType.transparency,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(20),
                           onTap: _showOfflineSensors,
@@ -419,12 +419,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text(
+                GlassLabel(child: Text(
                   palms.isEmpty
                       ? 'Last updated: No readings available'
                       : 'Last updated: ${fullDateTime(_latestUpdate(palms))}',
@@ -432,10 +433,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
-                ),
+                )),
                 const SizedBox(height: 20),
 
-                Row(
+                GlassBox(padding: const EdgeInsets.fromLTRB(14, 4, 4, 4), child: Row(
                   children: [
                     const Expanded(
                       child: Text(
@@ -451,23 +452,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: const Text('View All ›'),
                     ),
                   ],
-                ),
+                )),
                 if (recentAlerts.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Center(
-                      child: Text(
+                      child: GlassLabel(child: Text(
                         'No recent alerts.',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,
                         ),
-                      ),
+                      )),
                     ),
                   )
                 else
                   ...recentAlerts.map((alert) {
-                    return _alertCard(alert);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _alertCard(alert),
+                    );
                   }),
               ],
             ),
@@ -493,9 +497,12 @@ class _HomeScreenState extends State<HomeScreen> {
       Color color,
       Color background,
       ) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(20),
+    return GlassBox(
+      padding: EdgeInsets.zero,
+      radius: 20,
+      tint: background,
+      child: Material(
+      type: MaterialType.transparency,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
@@ -506,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(icon, size: 38, color: color),
+              appIcon(icon, size: 38, color: color),
               const SizedBox(width: 9),
               Expanded(
                 child: Column(
@@ -536,6 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -544,9 +552,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final palm = MockData.palmById(alert.palmId);
     final palmName = alert.palmId;
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+    return GlassBox(
+      padding: EdgeInsets.zero,
+      radius: 18,
+      child: Material(
+      type: MaterialType.transparency,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () async {
@@ -613,6 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -623,7 +634,6 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      backgroundColor: AppColors.background,
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
@@ -648,7 +658,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     shrinkWrap: true,
                     children: [
                       for (final palm in offlinePalms)
-                        Card(
+                        GlassCard(
                           child: ListTile(
                             leading: const Icon(
                               Icons.wifi_off,

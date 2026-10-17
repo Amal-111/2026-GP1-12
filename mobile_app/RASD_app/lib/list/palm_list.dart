@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
+import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import '../data/mock_data.dart';
 import 'palm_details.dart';
@@ -60,9 +62,13 @@ class _PalmListPageState extends State<PalmListPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Palm List', style: Theme.of(context).textTheme.headlineMedium),
-            Text('${palms.length} palms found',
-                style: Theme.of(context).textTheme.bodyMedium),
+            GlassLabel(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Palm List', style: Theme.of(context).textTheme.headlineMedium),
+                Text('${palms.length} palms found',
+                    style: Theme.of(context).textTheme.bodyMedium),
+              ]),
+            ),
             const SizedBox(height: 18),
             TextField(
               controller: _searchController,
@@ -90,16 +96,16 @@ class _PalmListPageState extends State<PalmListPage> {
           ]),
         ),
         Expanded(child: palms.isEmpty
-            ? const Center(child: Text('No palms found'))
+            ? const Center(child: GlassLabel(child: Text('No palms found')))
             : ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: palms.length,
           itemBuilder: (context, index) {
             final palm = palms[index];
             final color = _color(palm.status);
-            return Card(child: ListTile(
+            return GlassCard(child: ListTile(
               contentPadding: const EdgeInsets.all(14),
-              leading: Icon(Icons.park_rounded, size: 38, color: color),
+              leading: PalmIcon(size: 38, color: color),
               title: Text(palm.id),
               subtitle: Text('${palmStatusLabel(palm.status)}\n'
                   'Last updated: ${timeAgo(palm.updatedAt)}'),

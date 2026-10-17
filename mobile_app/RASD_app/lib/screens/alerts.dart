@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/glass_widgets.dart';
 import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import 'alert_details.dart';
@@ -44,7 +45,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             padding: EdgeInsets.all(16),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Alerts', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              child: GlassLabel(child: Text('Alerts', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: AppColors.primary))),
             ),
           ),
 
@@ -54,7 +55,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF3F0),
+                color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -71,7 +72,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           // Alerts list
           Expanded(
             child: alerts.isEmpty
-                ? Center(child: Text(showCurrent ? 'No current alerts.' : 'No alert history.'))
+                ? Center(child: GlassLabel(child: Text(showCurrent ? 'No current alerts.' : 'No alert history.')))
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: alerts.length,
@@ -80,7 +81,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                       final color = alertTypeColor(alert.type);
                       final palm = MockData.palmById(alert.palmId);
 
-                      return Card(
+                      return GlassCard(
                         margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(12),

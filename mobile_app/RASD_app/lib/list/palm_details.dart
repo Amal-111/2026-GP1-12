@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
+import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import 'monitoring_history.dart';
 import 'treatment_record.dart';
@@ -83,7 +85,7 @@ class PalmDetailsPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 // Palm image and identification
-                  Card(
+                  GlassCard(
                     margin: EdgeInsets.zero,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -96,9 +98,7 @@ class PalmDetailsPage extends StatelessWidget {
                               color: AppColors.beige,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Icon(
-                              Icons.park_rounded,
-                              size: 64,
+                            child: const PalmIcon(size: 64,
                               color: AppColors.primary,
                             ),
                           ),
@@ -157,16 +157,10 @@ class PalmDetailsPage extends StatelessWidget {
 // Suspected infestation alert
                   if (isSuspected) ...[
                     const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
+                    GlassBox(
                       padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.suspected.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppColors.suspected.withValues(alpha: 0.35),
-                        ),
-                      ),
+                      radius: 14,
+                      tint: const Color(0xFFFDECEC),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -213,7 +207,7 @@ class PalmDetailsPage extends StatelessWidget {
 
                   DefaultTabController(
                     length: 2,
-                    child: Card(
+                    child: GlassCard(
                       margin: EdgeInsets.zero,
                       clipBehavior: Clip.antiAlias,
                       child: Column(
@@ -381,7 +375,7 @@ class _MeasurementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return GlassCard(
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(14),

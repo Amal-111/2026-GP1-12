@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import '../data/mock_data.dart';
 
@@ -151,16 +152,16 @@ class _TreatmentRecordPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              GlassLabel(child: Text(
                 'Treatment  •  ${widget.palmId}',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge,
-              ),
+              )),
               const SizedBox(height: 20),
 
               // Treatment form
-              Card(
+              GlassCard(
                 margin: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -297,17 +298,17 @@ class _TreatmentRecordPageState
               const SizedBox(height: 28),
 
               // Treatment history heading
-              Text(
+              GlassLabel(child: Text(
                 'Treatment History',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge,
-              ),
+              )),
               const SizedBox(height: 12),
 
               // Empty state or previous treatments
               if (_records.isEmpty)
-                Card(
+                GlassCard(
                   margin: EdgeInsets.zero,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -355,7 +356,7 @@ class _TreatmentRecordPageState
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
+                    child: GlassCard(
                       margin: EdgeInsets.zero,
                       child: Padding(
                         padding: const EdgeInsets.all(14),
