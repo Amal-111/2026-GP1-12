@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../list/palm_details.dart';
+import '../data/mock_data.dart';
 
 class FarmMapPage extends StatefulWidget {
-  const FarmMapPage({super.key});
+  const FarmMapPage({super.key, this.farmId, this.highlightedPalmId});
+  final String? highlightedPalmId;
+  final String? farmId;
 
   @override
   State<FarmMapPage> createState() => _FarmMapPageState();
@@ -14,17 +17,59 @@ class FarmMapPage extends StatefulWidget {
 class _FarmMapPageState extends State<FarmMapPage> {
   DemoPalm? selectedPalm;
 
-  final List<DemoPalm> palms = const [
-    DemoPalm(id: 'P001', status: 'Healthy',    x: 0.08, y: 0.09),
-    DemoPalm(id: 'P002', status: 'Healthy',    x: 0.56, y: 0.16),
-    DemoPalm(id: 'P003', status: 'Monitoring', x: 0.82, y: 0.25),
-    DemoPalm(id: 'P004', status: 'Suspected',  x: 0.15, y: 0.33),
-    DemoPalm(id: 'P005', status: 'Healthy',    x: 0.57, y: 0.38),
-    DemoPalm(id: 'P006', status: 'Monitoring', x: 0.82, y: 0.40),
-    DemoPalm(id: 'P007', status: 'Treated',    x: 0.42, y: 0.50),
-    DemoPalm(id: 'P008', status: 'Offline',    x: 0.08, y: 0.80),
-    DemoPalm(id: 'P009', status: 'Healthy',    x: 0.75, y: 0.85),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    MockData.changes.addListener(_refresh);
+    if (widget.highlightedPalmId != null) {
+      for (final palm in palms) {
+        if (palm.id == widget.highlightedPalmId) {
+          selectedPalm = palm;
+          break;
+        }
+      }
+    }
+  }
+// need edit
+  void _refresh() {
+    if (mounted) setState(() {
+      if (selectedPalm != null) {
+        final matches = palms.where((p) => p.id == selectedPalm!.id);
+        selectedPalm = matches.isEmpty ? null : matches.first;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    MockData.changes.removeListener(_refresh);
+    super.dispose();
+  }
+
+
+  String get activeFarmId => MockData.currentUser.role == UserRole.farmer
+      ? (MockData.currentUser.farmId ?? '')
+      : (widget.farmId ?? MockData.selectedFarmId);
+
+  List<DemoPalm> get palms {
+    final data = MockData.palmsForFarm(activeFarmId);
+    const positions = [
+      [0.12, 0.12], [0.53, 0.17], [0.80, 0.30],
+      [0.22, 0.40], [0.63, 0.51], [0.22, 0.72], [0.74, 0.79],
+    ];
+    return List.generate(data.length, (i) {
+      final palm = data[i];
+      final position = positions[i % positions.length];
+      return DemoPalm(
+        id: palm.id,
+        status: !palm.deviceOnline ? 'Offline' :
+        palm.status == PalmStatus.underMonitoring ? 'Monitoring' :
+        palmStatusLabel(palm.status),
+        x: position[0], y: position[1],
+      );
+    });
+  }
+
 
 
   Color statusColor(String status) {
@@ -35,8 +80,6 @@ class _FarmMapPageState extends State<FarmMapPage> {
         return AppColors.suspected;
       case 'Monitoring':
         return AppColors.monitoring;
-      case 'Treated':
-        return AppColors.treated;
       case 'Offline':
         return AppColors.offline;
       default:
@@ -50,11 +93,6 @@ class _FarmMapPageState extends State<FarmMapPage> {
       MaterialPageRoute(
         builder: (_) => PalmDetailsPage(
           palmId: palm.id,
-          status: palm.status,
-          updated: '10 min ago',
-          temperature: 28.5,
-          humidity: 55.0,
-          deviceId: 'DEV-${palm.id}',
         ),
       ),
     );
@@ -68,7 +106,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text('Al Noor Farm'),
+        title: Text(MockData.farms.any((f) => f.id == activeFarmId) ? MockData.farms.firstWhere((f) => f.id == activeFarmId).name : 'Farm Map'),
         actions: [
           IconButton(
             tooltip: 'Map layers',
@@ -309,7 +347,7 @@ class _PalmInfoCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Palm #${palm.id}',
+                    palm.id,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -407,7 +445,6 @@ class _StatusLegend extends StatelessWidget {
       'Healthy',
       'Suspected',
       'Monitoring',
-      'Treated',
       'Offline',
     ];
 

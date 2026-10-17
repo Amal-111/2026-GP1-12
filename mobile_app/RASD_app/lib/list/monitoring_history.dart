@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../data/mock_data.dart';
 
 class MonitoringHistoryPage extends StatelessWidget {
   final String palmId;
@@ -10,35 +10,14 @@ class MonitoringHistoryPage extends StatelessWidget {
     required this.palmId,
   });
 
-  // Sample monitoring records for demonstration.
-
-  static final List<Map<String, String>> _sampleRecords = [
-    {
-      'date': '15 Sep 2024',
-      'time': '10:24 AM',
-      'result': 'Possible Pest Detected',
-    },
-    {
-      'date': '14 Sep 2024',
-      'time': '08:00 AM',
-      'result': 'No RPW Detected',
-    },
-    {
-      'date': '13 Sep 2024',
-      'time': '08:00 AM',
-      'result': 'No RPW Detected',
-    },
-    {
-      'date': '12 Sep 2024',
-      'time': '08:00 AM',
-      'result': 'No RPW Detected',
-    },
-    {
-      'date': '11 Sep 2024',
-      'time': '08:00 AM',
-      'result': 'No RPW Detected',
-    },
-  ];
+  List<Map<String, String>> get _sampleRecords =>
+      MockData.monitoringEventsForPalm(palmId).map((alert) => {
+        'date': '${alert.createdAt.day}/${alert.createdAt.month}/${alert.createdAt.year}',
+        'time': '${alert.createdAt.hour.toString().padLeft(2, '0')}:${alert.createdAt.minute.toString().padLeft(2, '0')}',
+        'result': alert.type == AlertType.suspected
+            ? 'Possible Pest Detected'
+            : alert.type == AlertType.monitoring ? 'Under Monitoring' : 'Sensor Offline',
+      }).toList();
 
   bool _isPestDetected(String result) {
     return result == 'Possible Pest Detected';
@@ -66,7 +45,7 @@ class MonitoringHistoryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Monitoring History - Palm #$palmId',
+                    'Monitoring History - $palmId',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge,
@@ -86,7 +65,9 @@ class MonitoringHistoryPage extends StatelessWidget {
             ),
 
             Expanded(
-              child: ListView.separated(
+              child: _sampleRecords.isEmpty
+                  ? const Center(child: Text('No monitoring events yet.'))
+                  : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
                   20,
                   0,
@@ -237,7 +218,7 @@ class MonitoringRecordDetailsPage extends StatelessWidget {
                     CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Palm #$palmId',
+                        palmId,
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge,

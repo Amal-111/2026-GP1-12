@@ -18,5 +18,6 @@ class AppColors {
   static const treated = Color(0xFF1976D2);
   static const monitoring = Color(0xFFF39C12);
   static const offline = Color(0xFF757575);
+
   static const error = Color(0xFFC62828);
 }

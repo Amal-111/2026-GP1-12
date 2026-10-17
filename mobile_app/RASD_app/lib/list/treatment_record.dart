@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../data/mock_data.dart';
 
 class TreatmentRecordPage extends StatefulWidget {
   final String palmId;
@@ -19,9 +20,6 @@ class TreatmentRecordPage extends StatefulWidget {
 
 class _TreatmentRecordPageState
     extends State<TreatmentRecordPage> {
-  // Temporary in-memory storage shared between page visits.
-  static final Map<String, List<Map<String, dynamic>>>
-  _recordsByPalm = {};
 
   static const List<String> _treatmentMethods = [
     'Chemical Treatment',
@@ -37,12 +35,7 @@ class _TreatmentRecordPageState
 
   bool _isSaving = false;
 
-  List<Map<String, dynamic>> get _records {
-    return _recordsByPalm.putIfAbsent(
-      widget.palmId,
-          () => [],
-    );
-  }
+  List<TreatmentEntry> get _records => MockData.treatmentsForPalm(widget.palmId);
 
   @override
   void initState() {
@@ -111,31 +104,28 @@ class _TreatmentRecordPageState
       _isSaving = true;
     });
 
-    final record = <String, dynamic>{
-      'date': _selectedDate,
-      'method': _selectedMethod!,
-      'notes': _notesController.text.trim(),
-      'createdAt': DateTime.now(),
-    };
-
+    final palm = MockData.palmById(widget.palmId);
+    if (palm == null) {
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Palm not found.')));
+      return;
+    }
+    if (palm.status != PalmStatus.suspected) {
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Treatment is only available for suspected palms.')),
+      );
+      return;
+    }
+    MockData.saveTreatment(palm: palm, date: _selectedDate,
+        method: _selectedMethod!, notes: _notesController.text.trim());
     setState(() {
-      _records.add(record);
-
-      // Newest treatment appears first.
-      _records.sort((a, b) {
-        final aDate = a['createdAt'] as DateTime;
-        final bDate = b['createdAt'] as DateTime;
-        return bDate.compareTo(aDate);
-      });
-
-      // Prepare the form for another treatment.
       _selectedDate = DateTime.now();
       _selectedMethod = null;
       _notesController.clear();
       _isSaving = false;
     });
-
-    // Notify Palm Details to update the palm status.
     widget.onMarkedTreated?.call();
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -162,7 +152,7 @@ class _TreatmentRecordPageState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Treatment  •  Palm #${widget.palmId}',
+                'Treatment  •  ${widget.palmId}',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge,
@@ -359,9 +349,9 @@ class _TreatmentRecordPageState
                 )
               else
                 ..._records.map((record) {
-                  final method = record['method'] as String;
-                  final date = record['date'] as DateTime;
-                  final notes = record['notes'] as String;
+                  final method = record.method;
+                  final date = record.date;
+                  final notes = record.notes;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
