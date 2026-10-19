@@ -11,10 +11,44 @@ class RasdUser {
   const RasdUser(this.name, this.role, {this.farmId});
 }
 
+class FarmerData {
+  final String id;
+  String name;
+  String email;
+  String phoneNumber;
+  String? farmId;
+
+  FarmerData({
+    required this.id,
+    required this.name,
+    required this.email,
+    this.phoneNumber = '',
+    this.farmId,
+  });
+}
+
 class RasdFarm {
   final String id;
-  final String name;
-  const RasdFarm(this.id, this.name);
+  String name;
+  String location;
+  String imagePath;
+  String description;
+  double? latitude;
+  double? longitude;
+  int palmCount;
+  int farmerCount;
+
+  RasdFarm(
+      this.id,
+      this.name, {
+        required this.location,
+        required this.imagePath,
+        this.description = '',
+        this.latitude,
+        this.longitude,
+        required this.palmCount,
+        required this.farmerCount,
+      });
 }
 
 class PalmData {
@@ -93,9 +127,118 @@ class MockData {
   static const farmer = RasdUser('Ahmed', UserRole.farmer, farmId: 'F001');
   static const owner = RasdUser('Sara', UserRole.farmOwner);
   static const currentUser = owner; // owner;
-  static const farms = [
-    RasdFarm('F001', 'Al Nakheel Farm'),
-    RasdFarm('F002', 'Al Waha Farm')
+  static final List<FarmerData> farmers = [
+    FarmerData(
+      id: 'FR001',
+      name: 'Ahmed Ali',
+      email: 'ahmed@rasd.com',
+      phoneNumber: '0501234567',
+      farmId: 'F001',
+    ),
+    FarmerData(
+      id: 'FR002',
+      name: 'Salem Khalid',
+      email: 'salem@rasd.com',
+      phoneNumber: '',
+      farmId: 'F001',
+    ),
+    FarmerData(
+      id: 'FR003',
+      name: 'Noura Fahad',
+      email: 'noura@rasd.com',
+      phoneNumber: '',
+      farmId: 'F002',
+    ),
+    FarmerData(
+      id: 'FR004',
+      name: 'Omar Ibrahim',
+      email: 'omar@rasd.com',
+      phoneNumber: '',
+      farmId: null,
+    ),
+  ];
+
+  static List<FarmerData> farmersForFarm([String? farmId]) =>
+      farmers
+          .where((farmer) => farmer.farmId == (farmId ?? selectedFarmId))
+          .toList();
+
+  static void deleteFarmer(FarmerData farmer) {
+    farmers.remove(farmer);
+    notifyChange();
+  }
+
+  static void updateFarmer(
+      FarmerData farmer, {
+        required String name,
+        required String email,
+        required String phoneNumber,
+      }) {
+    farmer
+      ..name = name
+      ..email = email
+      ..phoneNumber = phoneNumber;
+
+    notifyChange();
+  }
+  static void assignFarmerToFarm(FarmerData farmer, String farmId) {
+    farmer.farmId = farmId;
+    notifyChange();
+  }
+
+  static void updateFarm(
+      RasdFarm farm, {
+        required String name,
+        required String description,
+        required String location,
+        required String imagePath,
+        required double? latitude,
+        required double? longitude,
+      }) {
+    farm
+      ..name = name
+      ..description = description
+      ..location = location
+      ..imagePath = imagePath
+      ..latitude = latitude
+      ..longitude = longitude;
+
+    notifyChange();
+  }
+
+  static void deleteFarm(RasdFarm farm) {
+    farms.remove(farm);
+
+    palms.removeWhere((palm) => palm.farmId == farm.id);
+    farmers.removeWhere((farmer) => farmer.farmId == farm.id);
+    alerts.removeWhere((alert) => alert.farmId == farm.id);
+
+    notifyChange();
+  }
+
+  static final List<RasdFarm> farms = [
+    RasdFarm(
+      'F001',
+      'Al Nakheel Farm',
+      location: '24.7136, 46.6753',
+      imagePath: 'assets/images/farm_1.png',
+      description: '',
+      latitude: 24.7136,
+      longitude: 46.6753,
+      palmCount: 5,
+      farmerCount: 2,
+    ),
+    RasdFarm(
+      'F002',
+      'Al Waha Farm',
+      location: '24.7200, 46.6800',
+      imagePath: 'assets/images/farm_2.png',
+      description: '',
+      latitude: 24.7200,
+      longitude: 46.6800,
+      palmCount: 2,
+      farmerCount: 1,
+    ),
   ];
   static String selectedFarmId = 'F001';
 
@@ -109,7 +252,25 @@ class MockData {
           ? a
           : b);
 
+  static String nextFarmId() {
+    int maxNumber = 0;
 
+    for (final farm in farms) {
+      final number =
+          int.tryParse(farm.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+      if (number > maxNumber) {
+        maxNumber = number;
+      }
+    }
+
+    return 'F${(maxNumber + 1).toString().padLeft(3, '0')}';
+  }
+
+  static void addFarm(RasdFarm farm) {
+    farms.add(farm);
+    notifyChange();
+  }
 
   static final List<PalmData> palms = [
     PalmData(id: 'P001',
