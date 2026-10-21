@@ -14,7 +14,6 @@ class FarmManagementPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final farm = MockData.selectedFarm;
-    final palmCount = farm.palmCount;
 
     return PalmScaffold(
       appBar: glassAppBar(
@@ -75,9 +74,14 @@ class FarmManagementPage extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            '$palmCount Palms',
-                            style: Theme.of(context).textTheme.titleMedium,
+                          // Updates when palms are added / deleted in
+                          // Manage Palms.
+                          ListenableBuilder(
+                            listenable: MockData.changes,
+                            builder: (context, _) => Text(
+                              '${MockData.selectedFarm.palmCount} Palms',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
                         ],
                       ),
@@ -222,4 +226,4 @@ class _ManagementCard extends StatelessWidget {
       ),
     );
   }
-}
+}

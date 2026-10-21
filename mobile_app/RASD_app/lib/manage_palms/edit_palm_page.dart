@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'palm_store.dart';
+import 'palm_ui.dart';
 import '../theme/glass_widgets.dart';
 
 /// Edit Palm: opens with the palm's current information filled in.
@@ -99,12 +100,34 @@ class _EditPalmPageState extends State<EditPalmPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: GlassBox(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PalmHeaderCard(
+                      title: widget.palm.id,
+                      subtitle: [
+                        if (widget.palm.type != null) widget.palm.type!,
+                        if (widget.palm.age != null) '${widget.palm.age} yrs',
+                        'Sensor ${widget.palm.deviceId}',
+                      ].join(' · '),
+                      chip: InfoChip(
+                        text: widget.palm.statusLabel,
+                        color: palmStatusColor(widget.palm.statusLabel),
+                        icon: palmStatusIcon(widget.palm.statusLabel) ??
+                            Icons.check_circle_rounded,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    GlassBox(
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const SectionTitle(
+                        icon: Icons.edit_note_rounded,
+                        title: 'Palm Information',
+                      ),
                       Text('Palm ID', style: labelStyle),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -125,6 +148,9 @@ class _EditPalmPageState extends State<EditPalmPage> {
                         controller: _ageController,
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: PalmValidators.age,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.calendar_month_outlined),
+                        ),
                       ),
                       const SizedBox(height: 18),
                       Text('Type', style: labelStyle),
@@ -132,6 +158,9 @@ class _EditPalmPageState extends State<EditPalmPage> {
                       DropdownButtonFormField<String>(
                         initialValue: _type,
                         hint: const Text('Select palm type'),
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.category_outlined),
+                        ),
                         items: _withCurrent(PalmStore.palmTypes, _type)
                             .map((t) =>
                                 DropdownMenuItem(value: t, child: Text(t)))
@@ -144,6 +173,9 @@ class _EditPalmPageState extends State<EditPalmPage> {
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         initialValue: _status,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.monitor_heart_outlined),
+                        ),
                         items: _withCurrent(PalmStore.statuses, _status)
                             .map((s) =>
                                 DropdownMenuItem(value: s, child: Text(s)))
@@ -165,14 +197,11 @@ class _EditPalmPageState extends State<EditPalmPage> {
                           hintText: 'e.g. additional notes about this palm',
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'Sensor: ${widget.palm.deviceId}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                     ],
                   ),
                 ),
+                ),
+                  ],
                 ),
               ),
             ),

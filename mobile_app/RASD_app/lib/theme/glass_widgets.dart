@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
@@ -14,7 +13,6 @@ class PalmScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: appBar,
       body: body,
     );
@@ -96,15 +94,15 @@ AppBar glassAppBar({
     title: Text(title),
     leading: leading,
     actions: actions,
-    backgroundColor: Colors.white.withValues(alpha: 0.6),
-    surfaceTintColor: Colors.transparent,
-    scrolledUnderElevation: 0,
+    // Colors and title position come from the app theme, like the
+    // other pages.
   );
 }
 
-/// A see-through box that becomes more solid when the mouse is over it,
-/// when it is pressed, or when a field inside it is being typed in.
-class GlassBox extends StatefulWidget {
+/// Box around content: a white card with rounded corners and a soft
+/// shadow, like the cards in the rest of the app.
+/// The name stays GlassBox so the pages did not need to change.
+class GlassBox extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double radius;
@@ -121,51 +119,17 @@ class GlassBox extends StatefulWidget {
   });
 
   @override
-  State<GlassBox> createState() => _GlassBoxState();
-}
-
-class _GlassBoxState extends State<GlassBox> {
-  bool _hovered = false;
-  bool _pressed = false;
-  bool _focused = false;
-
-  bool get _active => _hovered || _pressed || _focused;
-
-  @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(widget.radius);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Listener(
-        onPointerDown: (_) => setState(() => _pressed = true),
-        onPointerUp: (_) => setState(() => _pressed = false),
-        onPointerCancel: (_) => setState(() => _pressed = false),
-        child: Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: widget.padding,
-                decoration: BoxDecoration(
-                  color: widget.tint.withValues(alpha: _active ? 0.92 : 0.55),
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-                child: widget.child,
-              ),
-            ),
-          ),
-        ),
+    // A real Card, so it looks exactly like the cards in the girls'
+    // pages (same color, shadow and corners from the app theme).
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: tint == Colors.white ? null : tint,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
       ),
+      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -184,7 +148,8 @@ class GlassLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassBox(padding: padding, radius: 12, child: child);
+    // With the white theme the text is easy to read, so no box is needed.
+    return child;
   }
 }
 
