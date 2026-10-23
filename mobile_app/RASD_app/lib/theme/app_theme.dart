@@ -1,206 +1,158 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'glass_widgets.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
+    final roundedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    );
+
     return ThemeData(
       useMaterial3: true,
-
-      // Global Font
       fontFamily: 'Cairo',
 
+      // Keep the route transition while using a neutral page background.
       scaffoldBackgroundColor: AppColors.background,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PalmPageTransitionsBuilder(),
+          TargetPlatform.iOS: PalmPageTransitionsBuilder(),
+          TargetPlatform.windows: PalmPageTransitionsBuilder(),
+          TargetPlatform.macOS: PalmPageTransitionsBuilder(),
+          TargetPlatform.linux: PalmPageTransitionsBuilder(),
+        },
+      ),
+
+      textTheme: ThemeData.light().textTheme.apply(
+        fontFamily: 'Cairo',
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
+      ),
 
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
-        secondary: AppColors.secondary,
         surface: AppColors.surface,
         error: AppColors.error,
       ),
 
-      // Typography
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-
-        headlineMedium: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-
-        titleMedium: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-
-        titleSmall: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textPrimary,
-        ),
-
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textPrimary,
-        ),
-
-        bodySmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textSecondary,
-        ),
-
-        labelLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-
-        labelMedium: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-
-      // AppBar
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.primary,
-        centerTitle: true,
-        elevation: 0,
-        // Keep the bar pure white (no green tint when scrolling).
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
-        titleTextStyle: TextStyle(
-          fontFamily: 'Cairo',
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-        ),
+        foregroundColor: AppColors.primary,
+        centerTitle: false,
+        elevation: 0,
       ),
 
-      // Primary Buttons
+      // Use dark green for primary actions; retain original dimensions.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          minimumSize: const Size(0, 52),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(0, 52),
-          textStyle: const TextStyle(
-            fontFamily: 'Cairo',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          iconColor: Colors.white,
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
-
-      // Secondary Buttons
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          minimumSize: const Size(0, 52),
-          side: const BorderSide(
-            color: AppColors.primary,
-          ),
-          textStyle: const TextStyle(
-            fontFamily: 'Cairo',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        style: glassButtonStyle.merge(
+          OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ),
 
-      // Cards
+      textButtonTheme: TextButtonThemeData(
+        style: glassButtonStyle.merge(
+          TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+
+      // Filter chips retain their original selection behavior.
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.background,
+        side: const BorderSide(color: AppColors.border),
+      ),
+
+      // Green icons on the light header.
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(foregroundColor: AppColors.primary),
+      ),
+
+      // Regular Cards share the same light surface and soft outline.
       cardTheme: CardThemeData(
-        color: AppColors.surface,
-        // Pure white cards with a clear soft shadow, so they stand out
-        // from the light grey background.
+        color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withValues(alpha: 0.18),
-        elevation: 2,
+        elevation: 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
         ),
       ),
 
-      // Text Fields
+      // Opaque inputs stay distinct from the light background.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
-
-        labelStyle: const TextStyle(
-          fontFamily: 'Cairo',
-          fontSize: 14,
-        ),
-
-        hintStyle: const TextStyle(
-          fontFamily: 'Cairo',
-          fontSize: 14,
-          color: AppColors.textSecondary,
-        ),
-
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-
+        fillColor: Colors.white,
+        border: roundedBorder,
+        enabledBorder: roundedBorder,
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.primary,
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
 
-      // Bottom Navigation Bar
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.surface,
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
 
-        // Light green background behind selected icon
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0xFFDCEDE0),
 
         labelBehavior:
         NavigationDestinationLabelBehavior.alwaysShow,
 
         iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+
           return IconThemeData(
-            color: states.contains(WidgetState.selected)
+            color: selected
                 ? AppColors.primary
                 : AppColors.textSecondary,
+            size: 28,
           );
         }),
 
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+
           return TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 13,
-            fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w700
-                : FontWeight.w500,
-            color: states.contains(WidgetState.selected)
+            fontSize: 12,
+            fontWeight:
+            selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
                 ? AppColors.primary
                 : AppColors.textSecondary,
           );
@@ -208,4 +160,4 @@ class AppTheme {
       ),
     );
   }
-}
+}

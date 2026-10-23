@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-
+import '../services/rasd_farms_service.dart';
 import '../auth/welcome_page.dart';
 import '../data/auth_store.dart';
+import '../services/firebase_auth_service.dart';
 import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
@@ -12,7 +13,12 @@ import 'guidance_page.dart';
 /// Profile page. Used as the Profile tab in Home and as a normal page
 /// (for example from the profile button in My Farms).
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final bool showBackButton;
+
+  const ProfilePage({
+    super.key,
+    this.showBackButton = true,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -53,7 +59,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (confirmed != true || !mounted) return;
 
-    AuthStore.logOut();
+    await RasdAuthService.logOut();
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const WelcomePage()),
@@ -64,12 +71,15 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final isFarmer = AuthStore.role == UserRole.farmer;
-    final farmLabel = isFarmer
-        ? (AuthStore.farmName ?? 'No farm assigned')
-        : '${MockData.farms.length} ${MockData.farms.length == 1 ? 'Farm' : 'Farms'}';
+    final farmLabel = AuthStore.farmName ?? 'No farm assigned';
 
     return PalmScaffold(
-      appBar: glassAppBar(title: 'Profile'),
+      appBar: glassAppBar(
+        title: 'Profile',
+        leading: widget.showBackButton
+            ? null
+            : const SizedBox.shrink(),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -118,7 +128,41 @@ class _ProfilePageState extends State<ProfilePage> {
                                 isFarmer ? 'Farmer' : 'Farm Owner',
                                 filled: true,
                               ),
-                              _Chip(farmLabel),
+                              if (isFarmer)
+                                FutureBuilder<String>(
+                                  future: RasdAuthService.getMyAssignedFarmName(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasError) {
+                                      return const _Chip('Unable to load farm');
+                                    }
+
+                                    if (!snapshot.hasData) {
+                                      return const _Chip('Loading...');
+                                    }
+
+                                    return _Chip(snapshot.data!);
+                                  },
+                                )
+
+                              else
+                                StreamBuilder<List<FarmRecord>>(
+                                  stream: RasdFarmsService.watchMyFarms(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasError) {
+                                      return const _Chip('Unavailable');
+                                    }
+
+                                    if (!snapshot.hasData) {
+                                      return const _Chip('...');
+                                    }
+
+                                    final count = snapshot.data!.length;
+
+                                    return _Chip(
+                                      '$count ${count == 1 ? 'Farm' : 'Farms'}',
+                                    );
+                                  },
+                                ),
                             ],
                           ),
                         ],

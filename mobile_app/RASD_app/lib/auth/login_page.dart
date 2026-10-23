@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/auth_store.dart';
+import '../services/firebase_auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
@@ -26,20 +26,19 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _logIn() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final error = AuthStore.logIn(
-      _emailController.text,
-      _passwordController.text,
-    );
-
-    if (error != null) {
-      showCenterMessage(context, error, success: false);
-      return;
+  bool _busy = false;
+  Future<void> _logIn() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await RasdAuthService.logIn(_emailController.text, _passwordController.text);
+      if (!mounted) return;
+      openAppAfterAuth(context);
+    } catch (error) {
+      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-
-    openAppAfterAuth(context);
   }
 
   @override
@@ -136,7 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _logIn,
+                      onPressed: _busy ? null : _logIn,
                       child: const Text('Log In'),
                     ),
                   ),

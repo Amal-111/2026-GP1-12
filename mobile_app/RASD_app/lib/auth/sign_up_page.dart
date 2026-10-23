@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../data/auth_store.dart';
+import '../services/firebase_auth_service.dart';
 import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
@@ -26,6 +27,18 @@ class _SignUpPageState extends State<SignUpPage> {
   UserRole _role = UserRole.farmOwner;
 
   @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _awaitingVerification = true;
+      _emailController.text = user.email ?? '';
+      _nameController.text = user.displayName ?? '';
+    }
+  }
+
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -35,23 +48,34 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  void _createAccount() {
+  bool _busy = false;
+  bool _awaitingVerification = false;
+  Future<void> _createAccount() async {
+    if (_busy) return;
     if (!_formKey.currentState!.validate()) return;
-
-    final error = AuthStore.signUp(
-      name: _nameController.text,
-      email: _emailController.text,
-      phone: _phoneController.text,
-      password: _passwordController.text,
-      role: _role,
-    );
-
-    if (error != null) {
-      showCenterMessage(context, error, success: false);
-      return;
+    setState(() => _busy = true);
+    try {
+      if (!_awaitingVerification) {
+        await RasdAuthService.signUp(
+          name: _nameController.text, email: _emailController.text,
+          phone: _phoneController.text, password: _passwordController.text,
+          role: _role,
+        );
+        if (!mounted) return;
+        setState(() => _awaitingVerification = true);
+        showCenterMessage(context, 'Verification email sent. Verify it, then tap Continue.');
+      } else {
+        await RasdAuthService.completeRegistration(
+          name: _nameController.text, phone: _phoneController.text, role: _role,
+        );
+        if (!mounted) return;
+        openAppAfterAuth(context);
+      }
+    } catch (error) {
+      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-
-    openAppAfterAuth(context);
   }
 
   @override
@@ -61,7 +85,17 @@ class _SignUpPageState extends State<SignUpPage> {
         title: 'Sign Up',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => const LoginPage(),
+                ),
+              );
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -108,7 +142,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           icon: Icons.lock_outline,
                           controller: _passwordController,
                           isPassword: true,
-                          validator: AuthValidators.password,
+                          validator: _awaitingVerification ? (_) => null : AuthValidators.password,
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
@@ -117,7 +151,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           icon: Icons.lock_outline,
                           controller: _confirmController,
                           isPassword: true,
-                          validator: (v) => v != _passwordController.text
+                          validator: (v) => !_awaitingVerification && v != _passwordController.text
                               ? 'Passwords do not match'
                               : null,
                         ),
@@ -171,8 +205,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _createAccount,
-                      child: const Text('Create Account'),
+                      onPressed: _busy ? null : _createAccount,
+                      child: Text(_awaitingVerification ? 'I Verified My Email — Continue' : 'Create Account'),
                     ),
                   ),
                   const SizedBox(height: 12),

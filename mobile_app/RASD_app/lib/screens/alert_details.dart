@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import '../theme/glass_widgets.dart';
-import '../data/mock_data.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../services/rasd_alert_service.dart';
 import '../theme/app_colors.dart';
 import 'alerts.dart';
 import '../list/palm_details.dart';
 import '../map/palm_map.dart';
 
 class AlertDetailsScreen extends StatefulWidget {
-  final AlertData alert;
+  final RasdAlert alert;
 
   const AlertDetailsScreen({super.key, required this.alert});
 
@@ -18,27 +19,24 @@ class AlertDetailsScreen extends StatefulWidget {
 
 class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
   @override
-  void initState() {
-    super.initState();
-    MockData.markRead(widget.alert);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final alert = widget.alert;
-    final palm = MockData.palmById(alert.palmId);
     final color = alertTypeColor(alert.type);
 
     String recommendation = 'Please inspect this palm tree and look for signs of infestation.';
-    if (alert.type == AlertType.monitoring) {
+    if (alert.type == 'UnderMonitoring') {
       recommendation = 'Continue monitoring this palm and follow the treatment schedule.';
-    } else if (alert.type == AlertType.deviceOffline) {
+    } else if (alert.type == 'SensorOffline') {
       recommendation = 'Check the device power and connection, then verify data transmission.';
     }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Alert Details')),
-      body: SingleChildScrollView(
+      body: StreamBuilder<DatabaseEvent>(
+        stream: FirebaseDatabase.instance.ref('palms/${alert.farmId}/${alert.palmId}').onValue,
+        builder: (context, snapshot) {
+          final hasPalmReference = alert.farmId.isNotEmpty && alert.palmId.isNotEmpty;
+          return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -56,10 +54,12 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                         Text(alert.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
                         Text(alert.palmId),
                         Text(
-                          '${alert.createdAt.day}/${alert.createdAt.month}/${alert.createdAt.year}'
-                              '  •  '
-                              '${alert.createdAt.hour.toString().padLeft(2, '0')}:'
-                              '${alert.createdAt.minute.toString().padLeft(2, '0')}',
+                          alert.createdAt == null
+                              ? 'Date unavailable'
+                              : '${alert.createdAt!.toLocal().day}/${alert.createdAt!.toLocal().month}/${alert.createdAt!.toLocal().year}'
+                                '  •  '
+                                '${alert.createdAt!.toLocal().hour.toString().padLeft(2, '0')}:'
+                                '${alert.createdAt!.toLocal().minute.toString().padLeft(2, '0')}',
                         ),
                       ],
                     ),
@@ -106,13 +106,13 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                           TextButton.icon(
                             icon: const Icon(Icons.map_outlined),
                             label: const Text('View on Map'),
-                            onPressed: palm == null ? null : () {
+                            onPressed: !hasPalmReference ? null : () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => FarmMapPage(
-                                    farmId: palm.farmId,
-                                    highlightedPalmId: palm.id,
+                                    farmId: alert.farmId,
+                                    highlightedPalmId: alert.palmId,
                                   ),
                                 ),
                               );
@@ -121,12 +121,12 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                           TextButton.icon(
                             icon: const PalmIcon(),
                             label: const Text('Palm Details'),
-                            onPressed: palm == null
+                            onPressed: !hasPalmReference
                                 ? null
                                 : () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(builder: (context) => PalmDetailsPage(palmId: palm.id)),
+                                      MaterialPageRoute(builder: (context) => PalmDetailsPage(farmId: alert.farmId, palmId: alert.palmId)),
                                     );
                                   },
                           ),
@@ -173,6 +173,8 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
             ),
           ],
         ),
+      );
+        },
       ),
     );
   }

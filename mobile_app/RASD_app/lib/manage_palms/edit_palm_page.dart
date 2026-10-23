@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
+
 import 'palm_store.dart';
-import 'palm_ui.dart';
+import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 
 /// Edit Palm: opens with the palm's current information filled in.
@@ -8,31 +10,40 @@ import '../theme/glass_widgets.dart';
 class EditPalmPage extends StatefulWidget {
   final Palm palm;
 
-  const EditPalmPage({super.key, required this.palm});
+  const EditPalmPage({
+    super.key,
+    required this.palm,
+  });
 
   @override
   State<EditPalmPage> createState() => _EditPalmPageState();
 }
 
 class _EditPalmPageState extends State<EditPalmPage> {
-  final PalmStore _store = PalmStore.instance;
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _idController;
   late final TextEditingController _ageController;
-  late final TextEditingController _notesController;
+
   String? _type;
   late String _status;
+
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+
     final palm = widget.palm;
-    // The user edits the number only; "P" is added by the system.
-    _idController =
-        TextEditingController(text: PalmStore.numberFromPalmId(palm.id));
-    _ageController = TextEditingController(text: '${palm.age ?? ''}');
-    _notesController = TextEditingController(text: palm.notes);
+
+    _idController = TextEditingController(
+      text: PalmStore.numberFromPalmId(palm.id),
+    );
+
+    _ageController = TextEditingController(
+      text: '${palm.age ?? ''}',
+    );
+
     _type = palm.type;
     _status = palm.statusLabel;
   }
@@ -41,32 +52,23 @@ class _EditPalmPageState extends State<EditPalmPage> {
   void dispose() {
     _idController.dispose();
     _ageController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
-  String? _validateId(String? value) {
-    final error = PalmValidators.palmId(value);
-    if (error != null) return error;
-    if (_store.idExists(PalmStore.palmIdFromNumber(value!),
-        except: widget.palm)) {
-      return 'This tree ID already exists in this farm.';
-    }
-    return null;
-  }
-
-  /// True if the user changed at least one field.
+  /// Checks whether the user changed any editable field.
   bool get _hasChanges {
     final palm = widget.palm;
-    return PalmStore.palmIdFromNumber(_idController.text) != palm.id ||
-        _ageController.text.trim() != '${palm.age ?? ''}' ||
-        _type != palm.type ||
-        _status != palm.statusLabel ||
-        _notesController.text.trim() != palm.notes;
+
+    return _ageController.text.trim() != '${palm.age ?? ''}' ||
+        _type != palm.type;
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save() async {
+    if (_isSaving) return;
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     if (!_hasChanges) {
       showCenterMessage(
@@ -77,15 +79,35 @@ class _EditPalmPageState extends State<EditPalmPage> {
       return;
     }
 
-    _store.updatePalm(
-      widget.palm,
-      id: PalmStore.palmIdFromNumber(_idController.text),
-      age: int.parse(_ageController.text.trim()),
-      type: _type!,
-      status: _status,
-      notes: _notesController.text,
-    );
-    Navigator.pop(context, true);
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await RasdManagementService.updatePalm(
+        widget.palm,
+        age: int.parse(_ageController.text.trim()),
+        type: _type!,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+
+      showCenterMessage(
+        context,
+        error.toString(),
+        success: false,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   @override
@@ -93,125 +115,147 @@ class _EditPalmPageState extends State<EditPalmPage> {
     final labelStyle = Theme.of(context).textTheme.titleSmall;
 
     return PalmScaffold(
-      appBar: glassAppBar(title: 'Edit Palm'),
+      appBar: glassAppBar(
+        title: 'Edit Palm',
+      ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    PalmHeaderCard(
-                      title: widget.palm.id,
-                      subtitle: [
-                        if (widget.palm.type != null) widget.palm.type!,
-                        if (widget.palm.age != null) '${widget.palm.age} yrs',
-                        'Sensor ${widget.palm.deviceId}',
-                      ].join(' · '),
-                      chip: InfoChip(
-                        text: widget.palm.statusLabel,
-                        color: palmStatusColor(widget.palm.statusLabel),
-                        icon: palmStatusIcon(widget.palm.statusLabel) ??
-                            Icons.check_circle_rounded,
-                      ),
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  20,
+                ),
+                child: GlassBox(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Palm ID - Read Only
+                        Text(
+                          'Palm ID',
+                          style: labelStyle,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        TextFormField(
+                          controller: _idController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.tag),
+                            prefixText: 'P',
+                            helperText:
+                            'Assigned by the system; cannot be changed',
+                          ),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Palm Age
+                        Text(
+                          'Age (years)',
+                          style: labelStyle,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        TextFormField(
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
+                          autovalidateMode:
+                          AutovalidateMode.onUserInteraction,
+                          validator: PalmValidators.age,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Palm Type
+                        Text(
+                          'Type',
+                          style: labelStyle,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        DropdownButtonFormField<String>(
+                          initialValue: _type,
+                          hint: const Text('Select palm type'),
+                          items: _withCurrent(
+                            PalmStore.palmTypes,
+                            _type,
+                          ).map((type) {
+                            return DropdownMenuItem<String>(
+                              value: type,
+                              child: Text(type),
+                            );
+                          }).toList(),
+                          validator: PalmValidators.required,
+                          onChanged: (value) {
+                            setState(() {
+                              _type = value;
+                            });
+                          },
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Palm Status - Read Only
+                        Text(
+                          'Status',
+                          style: labelStyle,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        DropdownButtonFormField<String>(
+                          initialValue: _status,
+                          items: _withCurrent(
+                            PalmStore.statuses,
+                            _status,
+                          ).map((status) {
+                            return DropdownMenuItem<String>(
+                              value: status,
+                              child: Text(status),
+                            );
+                          }).toList(),
+                          onChanged: null,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Connected Sensor - Read Only
+                        Text(
+                          'Sensor: ${widget.palm.deviceId.isEmpty ? 'Not connected' : widget.palm.deviceId}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    GlassBox(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionTitle(
-                        icon: Icons.edit_note_rounded,
-                        title: 'Palm Information',
-                      ),
-                      Text('Palm ID', style: labelStyle),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _idController,
-                        validator: _validateId,
-                        // Letters can be typed, but an error message appears.
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.tag),
-                          prefixText: 'P',
-                          helperText: '3 digits, e.g. 008',
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Age (years)', style: labelStyle),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _ageController,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        validator: PalmValidators.age,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.calendar_month_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Type', style: labelStyle),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _type,
-                        hint: const Text('Select palm type'),
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.category_outlined),
-                        ),
-                        items: _withCurrent(PalmStore.palmTypes, _type)
-                            .map((t) =>
-                                DropdownMenuItem(value: t, child: Text(t)))
-                            .toList(),
-                        validator: PalmValidators.required,
-                        onChanged: (v) => setState(() => _type = v),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Status', style: labelStyle),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _status,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.monitor_heart_outlined),
-                        ),
-                        items: _withCurrent(PalmStore.statuses, _status)
-                            .map((s) =>
-                                DropdownMenuItem(value: s, child: Text(s)))
-                            .toList(),
-                        onChanged: (v) => setState(() => _status = v!),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Notes (optional)', style: labelStyle),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _notesController,
-                        // Free text: letters, numbers, Arabic or English.
-                        keyboardType: TextInputType.multiline,
-                        textCapitalization: TextCapitalization.sentences,
-                        minLines: 3,
-                        maxLines: 6,
-                        maxLength: 300,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. additional notes about this palm',
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-                ),
-                  ],
                 ),
               ),
             ),
+
+            // Save Changes Button
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _save,
-                  child: const Text('Save Changes'),
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  )
+                      : const Text('Save Changes'),
                 ),
               ),
             ),
@@ -221,9 +265,15 @@ class _EditPalmPageState extends State<EditPalmPage> {
     );
   }
 
-  /// Makes sure the current value is in the list (avoids a dropdown crash).
-  List<String> _withCurrent(List<String> options, String? current) {
-    if (current == null || options.contains(current)) return options;
+  /// Keeps the current value in the dropdown options.
+  List<String> _withCurrent(
+      List<String> options,
+      String? current,
+      ) {
+    if (current == null || options.contains(current)) {
+      return options;
+    }
+
     return [...options, current];
   }
 }

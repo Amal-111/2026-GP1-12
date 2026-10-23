@@ -46,9 +46,6 @@ class PalmStore {
     'Khalas',
     'Ajwa',
     'Barhi',
-    'Segae',
-    'Medjool',
-    'Other',
   ];
 
   static const List<String> statuses = [

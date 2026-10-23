@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "965209952696",
+    "firebase_url": "https://rasd-6a036-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "rasd-6a036",
+    "storage_bucket": "rasd-6a036.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:965209952696:android:e02a1aacc1aa3252b93f4d",
+        "android_client_info": {
+          "package_name": "rasd.com.rasd_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAhSZDIlqU0ya5Gv-xIB6WPmOj8aNAe8I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -126,7 +126,7 @@ class MockData {
 
   static const farmer = RasdUser('Ahmed', UserRole.farmer, farmId: 'F001');
   static const owner = RasdUser('Sara', UserRole.farmOwner);
-  static const currentUser = owner; // owner;
+  static RasdUser currentUser = farmer; // owner;
   static final List<FarmerData> farmers = [
     FarmerData(
       id: 'FR001',
@@ -427,15 +427,7 @@ class MockData {
 
   static void addPalm(PalmData palm) {
     palms.add(palm);
-    _farmOf(palm)?.palmCount++; // keep the farm's palm count right
     notifyChange();
-  }
-
-  static RasdFarm? _farmOf(PalmData palm) {
-    for (final farm in farms) {
-      if (farm.id == palm.farmId) return farm;
-    }
-    return null;
   }
 
   /// Saves the edited information. If the ID changed, the palm's alerts
@@ -464,8 +456,6 @@ class MockData {
   /// Deletes the palm and everything related to it (alerts, treatments).
   static void deletePalm(PalmData palm) {
     palms.remove(palm);
-    final farm = _farmOf(palm);
-    if (farm != null && farm.palmCount > 0) farm.palmCount--;
     alerts.removeWhere((a) => a.palmId == palm.id);
     treatments.removeWhere((t) => t.palmId == palm.id);
     notifyChange();
