@@ -1,0 +1,73 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".indexOn": [
+        "farmId"
+      ],
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || (data.child('role').val() === 'Farmer' && data.child('farmId').isString() && root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid))"
+      },
+      ".read": "auth != null && query.orderByChild === 'farmId' && query.equalTo !== null && root.child('farms').child(query.equalTo).child('ownerId').val() === auth.uid && root.child('users').child(auth.uid).child('role').val() === 'FarmOwner'"
+    },
+    "farms": {
+      ".indexOn": [
+        "ownerId"
+      ],
+      ".read": "auth != null && query.orderByChild === 'ownerId' && query.equalTo === auth.uid && root.child('users').child(auth.uid).child('role').val() === 'FarmOwner'",
+      "$farmId": {
+        ".read": "auth != null && (data.child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))"
+      }
+    },
+    "palms": {
+      "$farmId": {
+        ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))"
+      }
+    },
+    "monitoringDevices": {
+      "$deviceId": {
+        ".read": "auth != null && data.child('farmId').isString() && (root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === data.child('farmId').val()))"
+      }
+    },
+    "monitoringHistory": {
+      "$farmId": {
+        ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))",
+        "$palmId": {
+          ".indexOn": [
+            "timestamp"
+          ]
+        }
+      }
+    },
+    "treatmentRecords": {
+      "$farmId": {
+        ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))",
+        "$palmId": {
+          ".indexOn": [
+            "treatmentDate"
+          ]
+        }
+      }
+    },
+    "alerts": {
+      "$farmId": {
+        ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))",
+        ".indexOn": [
+          "timestamp"
+        ]
+      }
+    },
+    "farmInvitations": {
+      ".indexOn": [
+        "farmerId",
+        "farmId"
+      ],
+      "$invitationId": {
+        ".read": "auth != null && (data.child('farmerId').val() === auth.uid || root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid)"
+      },
+      ".read": "auth != null && ((query.orderByChild === 'farmerId' && query.equalTo === auth.uid) || (query.orderByChild === 'farmId' && query.equalTo !== null && root.child('farms').child(query.equalTo).child('ownerId').val() === auth.uid))"
+    }
+  }
+}
+ 
