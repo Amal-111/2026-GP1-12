@@ -11,6 +11,7 @@ class PalmScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: appBar,
       body: body,
     );
@@ -110,6 +111,17 @@ class GlassBox extends StatefulWidget {
   });
 
   @override
+  State<GlassBox> createState() => _GlassBoxState();
+}
+
+class _GlassBoxState extends State<GlassBox> {
+  bool _hovered = false;
+  bool _pressed = false;
+  bool _focused = false;
+
+  bool get _active => _hovered || _pressed || _focused;
+
+  @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(widget.radius);
 
@@ -143,7 +155,6 @@ class GlassBox extends StatefulWidget {
           ),
         ),
       ),
-      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -161,8 +172,7 @@ class GlassLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // With the white theme the text is easy to read, so no box is needed.
-    return child;
+    return GlassBox(padding: padding, radius: 12, child: child);
   }
 }
 

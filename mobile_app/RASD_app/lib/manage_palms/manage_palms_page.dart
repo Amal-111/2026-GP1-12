@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
 import '../services/rasd_management_service.dart';
@@ -17,8 +18,6 @@ class ManagePalmsPage extends StatefulWidget {
 class _ManagePalmsPageState extends State<ManagePalmsPage> {
   final PalmStore _store = PalmStore.instance;
   final TextEditingController _searchController = TextEditingController();
-  String _filter = 'All';
-  static const _filters = ['All', 'Healthy', 'Suspected', 'Under Monitoring'];
 
   @override
   void dispose() {
@@ -32,8 +31,6 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
       return query.isEmpty ||
           palm.id.toLowerCase().contains(query) ||
           (palm.type ?? '').toLowerCase().contains(query);
-      final matchesFilter = _filter == 'All' || palm.statusLabel == _filter;
-      return matchesSearch && matchesFilter;
     }).toList();
   }
 
@@ -103,10 +100,40 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }
   }
 
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Healthy':
+        return AppColors.healthy;
+      case 'Suspected':
+        return AppColors.suspected;
+      case 'Under Monitoring':
+        return AppColors.monitoring;
+      case 'Treated':
+        return AppColors.treated;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'Suspected':
+        return Icons.warning_rounded;
+      case 'Under Monitoring':
+        return Icons.access_time_rounded;
+      case 'Treated':
+        return Icons.medical_services_rounded;
+      default:
+        return Icons.park_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PalmScaffold(
-      appBar: glassAppBar(title: 'Manage Palms'),
+      appBar: glassAppBar(
+        title: 'Manage Palms',
+      ),
       body: SafeArea(
         child: StreamBuilder<List<Palm>>(
           stream: RasdManagementService.watchPalms(),
@@ -115,107 +142,30 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
             final palms = _filteredPalms(snapshot.data!);
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Palms',
-                          style: Theme.of(context).textTheme.headlineMedium),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined,
-                              size: 16, color: AppColors.brown),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${MockData.selectedFarm.name} · $total palms',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppColors.textSecondary),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Search by Palm ID or type...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchController.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {});
-                                  },
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Status filters, like the palm list page.
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _filters.map((f) {
-                            final selected = _filter == f;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(f),
-                                selected: selected,
-                                showCheckmark: false,
-                                onSelected: (_) => setState(() => _filter = f),
-                                backgroundColor: AppColors.surface,
-                                selectedColor: AppColors.primary,
-                                labelStyle: TextStyle(
-                                  fontFamily: 'Cairo',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                ),
-                                side: BorderSide(
-                                  color: selected
-                                      ? AppColors.primary
-                                      : AppColors.border,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search by Palm ID...',
+                      prefixIcon: Icon(Icons.search),
+                    ),
                   ),
                 ),
                 Expanded(
                   child: palms.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.search_off_rounded,
-                                  size: 52, color: AppColors.textSecondary),
-                              const SizedBox(height: 10),
-                              Text('No palms found',
-                                  style:
-                                      Theme.of(context).textTheme.titleMedium),
-                              Text('Try another search or add a palm.',
-                                  style: Theme.of(context).textTheme.bodySmall),
-                            ],
+                          child: GlassBox(
+                            child: Text(
+                              'No palms found',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
                         )
                       : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                           itemCount: palms.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 10),
@@ -244,46 +194,35 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
   }
 
   Widget _buildPalmCard(Palm palm) {
-    final status = palm.statusLabel;
-    final color = palmStatusColor(status);
-    final details = [
-      if (palm.type != null) palm.type!,
-      if (palm.age != null) '${palm.age} yrs',
-    ].join(' · ');
+    final color = _statusColor(palm.statusLabel);
 
     return GlassBox(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
       child: Row(
-        children: [
-          StatusTile(status: status),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(palm.id, style: Theme.of(context).textTheme.titleMedium),
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-                if (details.isNotEmpty)
-                  Text(details, style: Theme.of(context).textTheme.bodySmall),
-                Row(
-                  children: [
-                    const Icon(Icons.sensors_rounded,
-                        size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '${palm.deviceId} · ${timeAgo(palm.updatedAt)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+          children: [
+            Container(
+              width: 52,
+              height: 58,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: appIcon(_statusIcon(palm.statusLabel), color: color, size: 30),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(palm.id,
+                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    palm.statusLabel,
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: color,
                     ),
                   ),
                   Text(
@@ -292,17 +231,21 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              RoundIconButton(
-                icon: Icons.delete_outline,
-                color: AppColors.error,
-                tooltip: 'Delete',
-                onPressed: () => _confirmDelete(palm),
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+            IconButton(
+              onPressed: () => _openEditPalm(palm),
+              icon: const Icon(Icons.edit_outlined),
+              color: AppColors.primary,
+              tooltip: 'Edit',
+            ),
+            IconButton(
+              onPressed: () => _confirmDelete(palm),
+              icon: const Icon(Icons.delete_outline),
+              color: AppColors.error,
+              tooltip: 'Delete',
+            ),
+          ],
+        ),
     );
   }
 }
