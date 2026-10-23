@@ -237,6 +237,8 @@ class _EditPalmPageState extends State<EditPalmPage> {
                     ),
                   ),
                 ),
+                  ],
+                ),
               ),
             ),
 

@@ -103,8 +103,17 @@ class _AddPalmPageState extends State<AddPalmPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      PalmHeaderCard(
+                        title: 'New Palm $_palmId',
+                        subtitle: MockData.selectedFarm.name,
+                        chip: InfoChip(
+                          text: 'Step ${_step + 1} of 3',
+                          icon: Icons.flag_outlined,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                       GlassBox(child: PalmStepHeader(currentStep: _step)),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       GlassBox(
                         child: _step == 0
                             ? _buildInfoStep()
@@ -137,6 +146,10 @@ class _AddPalmPageState extends State<AddPalmPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SectionTitle(
+            icon: Icons.info_outline_rounded,
+            title: 'Palm Information',
+          ),
           const _FieldLabel('Palm ID'),
           // Given by the system, cannot be changed here.
           TextFormField(
@@ -154,13 +167,19 @@ class _AddPalmPageState extends State<AddPalmPage> {
             controller: _ageController,
             autovalidateMode: AutovalidateMode.onUserInteraction,
             validator: PalmValidators.age,
-            decoration: const InputDecoration(hintText: 'e.g. 10'),
+            decoration: const InputDecoration(
+              hintText: 'e.g. 10',
+              prefixIcon: Icon(Icons.calendar_month_outlined),
+            ),
           ),
           const SizedBox(height: 18),
           const _FieldLabel('Type'),
           DropdownButtonFormField<String>(
             initialValue: _type,
             hint: const Text('Select palm type'),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.category_outlined),
+            ),
             items: PalmStore.palmTypes
                 .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                 .toList(),
@@ -178,6 +197,10 @@ class _AddPalmPageState extends State<AddPalmPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SectionTitle(
+            icon: Icons.location_on_outlined,
+            title: 'Palm Location',
+          ),
           FarmLocationPicker(
             latitude: double.tryParse(_latController.text.trim()),
             longitude: double.tryParse(_lngController.text.trim()),
@@ -247,7 +270,8 @@ class _AddPalmPageState extends State<AddPalmPage> {
   }
 }
 
-/// The 3 steps shown at the top of Add Palm and Connect Sensor.
+/// The 3 steps shown at the top of Add Palm and Connect Sensor:
+/// numbered circles joined by a line, with a short description.
 class PalmStepHeader extends StatelessWidget {
   final int currentStep; // 0, 1 or 2
 
@@ -259,44 +283,96 @@ class PalmStepHeader extends StatelessWidget {
     'Connect Sensor',
   ];
 
+  static const _descriptions = [
+    'Age and type of the palm',
+    'Choose where the palm is on the map',
+    'Link a monitoring sensor to the palm',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: List.generate(_titles.length, (i) {
-        final active = i <= currentStep;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+        final done = i < currentStep;
+        final current = i == currentStep;
+        final active = done || current;
+        final isLast = i == _titles.length - 1;
+
+        return IntrinsicHeight(
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor:
-                    active ? AppColors.primary : AppColors.border,
-                child: i < currentStep
-                    ? const Icon(Icons.check, size: 18, color: Colors.white)
-                    : Text(
-                        '${i + 1}',
+              // Circle + line to the next step.
+              Column(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active ? AppColors.primary : AppColors.surface,
+                      border: Border.all(
+                        color: active ? AppColors.primary : AppColors.border,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: done
+                          ? const Icon(Icons.check,
+                              size: 18, color: Colors.white)
+                          : Text(
+                              '${i + 1}',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w700,
+                                color: active
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                    ),
+                  ),
+                  if (!isLast)
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        color: done ? AppColors.primary : AppColors.border,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 14, top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _titles[i],
                         style: TextStyle(
                           fontFamily: 'Cairo',
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: active
-                              ? Colors.white
+                              ? AppColors.textPrimary
                               : AppColors.textSecondary,
                         ),
                       ),
-              ),
-              const SizedBox(width: 14),
-              Text(
-                _titles[i],
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: active
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
+                      Text(
+                        _descriptions[i],
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
               ),
+              if (current)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: InfoChip(text: 'Now'),
+                ),
             ],
           ),
         );

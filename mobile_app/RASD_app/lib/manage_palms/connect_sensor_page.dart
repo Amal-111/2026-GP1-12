@@ -3,6 +3,7 @@ import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
 import 'add_palm_page.dart';
+import 'palm_ui.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_management_service.dart';
 /// Step 3 of adding a palm: connect its monitoring sensor.
@@ -80,12 +81,25 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      PalmHeaderCard(
+                        title: 'New Palm ${widget.palmId}',
+                        subtitle: '${widget.type} · ${widget.age} yrs',
+                        chip: const InfoChip(
+                          text: 'Step 3 of 3',
+                          icon: Icons.flag_outlined,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                       const GlassBox(child: PalmStepHeader(currentStep: 2)),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       GlassBox(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                      const SectionTitle(
+                        icon: Icons.sensors_rounded,
+                        title: 'Sensor Settings',
+                      ),
                       _buildLinkedPalmCard(),
                       const SizedBox(height: 22),
                       Text('Device ID',
