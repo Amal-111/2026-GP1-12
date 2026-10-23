@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../auth/auth_widgets.dart';
-import '../data/auth_store.dart';
+import '../services/firebase_auth_service.dart';
 import '../theme/glass_widgets.dart';
 
 /// Pops with `true` when the password was changed.
@@ -26,20 +26,18 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
-  void _update() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final error = AuthStore.changePassword(
-      _currentController.text,
-      _newController.text,
-    );
-
-    if (error != null) {
-      showCenterMessage(context, error, success: false);
-      return;
+  bool _busy = false;
+  Future<void> _update() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await RasdAuthService.changePassword(_currentController.text, _newController.text);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-
-    Navigator.pop(context, true);
   }
 
   @override
@@ -104,7 +102,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _update,
+                  onPressed: _busy ? null : _update,
                   child: const Text('Update Password'),
                 ),
               ),

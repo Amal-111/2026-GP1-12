@@ -68,6 +68,15 @@ class AuthStore {
   static final ValueNotifier<bool> notificationsOn = ValueNotifier<bool>(true);
 
   static Account? _current;
+  static String? _firebaseFarmId;
+
+  static void setFirebaseAccount(Account account, {String? farmId}) {
+    _current = account;
+    _firebaseFarmId = farmId;
+    MockData.currentUser = RasdUser(account.ownerName, account.role, farmId: farmId);
+    MockData.notifyChange();
+  }
+
 
   /// The logged-in account. If nobody logged in (for example a teammate
   /// starts the app on another page) it falls back to MockData.currentUser.
@@ -92,9 +101,9 @@ class AuthStore {
 
   static UserRole get role => currentAccount.role;
   static String get email => currentAccount.email;
-  static String get name => _farmerData?.name ?? currentAccount.ownerName;
-  static String get phone => _farmerData?.phoneNumber ?? currentAccount.ownerPhone;
-  static String? get farmId => _farmerData?.farmId;
+  static String get name => _firebaseFarmId != null || currentAccount.id.length > 20 ? currentAccount.ownerName : (_farmerData?.name ?? currentAccount.ownerName);
+  static String get phone => currentAccount.id.length > 20 ? currentAccount.ownerPhone : (_farmerData?.phoneNumber ?? currentAccount.ownerPhone);
+  static String? get farmId => _firebaseFarmId ?? _farmerData?.farmId;
 
   static String? get farmName {
     final id = farmId;
@@ -179,6 +188,7 @@ class AuthStore {
 
   static void logOut() {
     _current = null;
+    _firebaseFarmId = null;
   }
 
   // ---------------- profile changes ----------------

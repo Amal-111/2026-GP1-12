@@ -85,7 +85,7 @@ class WelcomePage extends StatelessWidget {
                   Text(
                     'Healthy Palms, Stronger Farms',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

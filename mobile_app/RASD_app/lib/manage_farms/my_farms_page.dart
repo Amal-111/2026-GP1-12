@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
-
+import '../services/selected_farm_service.dart';
 import '../data/mock_data.dart';
+import '../services/rasd_farms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../screens/home.dart';
 import 'farm_management_page.dart';
 import 'add_farm_page.dart';
+import '../profile/profile_page.dart';
 
 class MyFarmsPage extends StatelessWidget {
   const MyFarmsPage({super.key});
+
+  static void _selectFarmForLegacyScreens(FarmRecord farm) {
+    MockData.farms.removeWhere((f) => f.id == farm.id);
+    MockData.farms.add(RasdFarm(farm.id, farm.name,
+      location: '${farm.latitude}, ${farm.longitude}', imagePath: '',
+      description: farm.description, latitude: farm.latitude,
+      longitude: farm.longitude, palmCount: farm.totalPalms, farmerCount: 0));
+    MockData.selectedFarmId = farm.id;
+    MockData.notifyChange();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,24 +33,37 @@ class MyFarmsPage extends StatelessWidget {
             child: CircleAvatar(
               radius: 23,
               backgroundColor: Colors.white.withValues(alpha: 0.6),
-              child: IconButton(
+              child:
+              IconButton(
                 icon: const Icon(
                   Icons.person,
                   color: AppColors.primary,
                 ),
                 onPressed: () {
-                  // Profile navigation will be connected later.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfilePage(),
+                    ),
+                  );
                 },
               ),
+
             ),
           ),
         ],
       ),
       body: SafeArea(
-        child: ListenableBuilder(
-          listenable: MockData.changes,
-          builder: (context, _) {
-            final farms = MockData.farms;
+        child: StreamBuilder<List<FarmRecord>>(
+          stream: RasdFarmsService.watchMyFarms(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('Unable to load farms: ${snapshot.error}'));
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final farms = snapshot.data!;
 
             return Column(
               children: [
@@ -78,14 +103,14 @@ class MyFarmsPage extends StatelessWidget {
                     const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final farm = farms[index];
-                      final palmCount = farm.palmCount;
+                      final palmCount = farm.totalPalms;
 
                       return _FarmCard(
                         farm: farm,
                         palmCount: palmCount,
                         onTap: () {
-                          MockData.selectedFarmId = farm.id;
-                          MockData.notifyChange();
+                          SelectedFarmService.selectFarm(farm.id);
+                          _selectFarmForLegacyScreens(farm);
 
                           Navigator.push(
                             context,
@@ -95,13 +120,13 @@ class MyFarmsPage extends StatelessWidget {
                           );
                         },
                         onManage: () {
-                          MockData.selectedFarmId = farm.id;
-                          MockData.notifyChange();
+                          SelectedFarmService.selectFarm(farm.id);
+                          _selectFarmForLegacyScreens(farm);
 
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const FarmManagementPage(),
+                              builder: (_) => FarmManagementPage(farmId: farm.id),
                             ),
                           );
                         },
@@ -119,7 +144,7 @@ class MyFarmsPage extends StatelessWidget {
 }
 
 class _FarmCard extends StatelessWidget {
-  final RasdFarm farm;
+  final FarmRecord farm;
   final int palmCount;
   final VoidCallback onTap;
   final VoidCallback onManage;
@@ -145,10 +170,10 @@ class _FarmCard extends StatelessWidget {
             child: SizedBox(
               width: 88,
               height: 88,
-              child: farm.imagePath.isEmpty
+              child: farm.image.isEmpty
                   ? _buildImageFallback()
-                  : Image.asset(
-                farm.imagePath,
+                  : Image.network(
+                farm.image,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return _buildImageFallback();
@@ -172,7 +197,7 @@ class _FarmCard extends StatelessWidget {
                 const SizedBox(height: 4),
 
                 Text(
-                  '$palmCount Palms · ${farm.farmerCount} ${farm.farmerCount == 1 ? 'Farmer' : 'Farmers'}',
+                  '$palmCount Total Palms',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),

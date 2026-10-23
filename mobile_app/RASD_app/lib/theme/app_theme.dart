@@ -6,16 +6,15 @@ class AppTheme {
   static ThemeData get lightTheme {
     final roundedBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.8)),
+      borderSide: const BorderSide(color: AppColors.border),
     );
 
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'Cairo',
 
-      // Pages are see-through: the palm photo is drawn behind every page
-      // by PalmPageTransitionsBuilder (see glass_widgets.dart).
-      scaffoldBackgroundColor: Colors.transparent,
+      // Keep the route transition while using a neutral page background.
+      scaffoldBackgroundColor: AppColors.background,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: PalmPageTransitionsBuilder(),
@@ -26,6 +25,12 @@ class AppTheme {
         },
       ),
 
+      textTheme: ThemeData.light().textTheme.apply(
+        fontFamily: 'Cairo',
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
+      ),
+
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
@@ -34,7 +39,7 @@ class AppTheme {
       ),
 
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white.withValues(alpha: 0.6),
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         foregroundColor: AppColors.primary,
@@ -42,14 +47,16 @@ class AppTheme {
         elevation: 0,
       ),
 
-      // Buttons: white glass with green text (more solid on hover/press).
+      // Use dark green for primary actions; retain original dimensions.
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: glassButtonStyle.merge(
-          ElevatedButton.styleFrom(
-            minimumSize: const Size(0, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          iconColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
@@ -75,32 +82,32 @@ class AppTheme {
         ),
       ),
 
-      // Filter chips (All / Healthy / ...): glass when not selected.
+      // Filter chips retain their original selection behavior.
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.white.withValues(alpha: 0.6),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.8)),
+        backgroundColor: AppColors.background,
+        side: const BorderSide(color: AppColors.border),
       ),
 
-      // Round icon buttons on top of the photo.
+      // Green icons on the light header.
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(foregroundColor: AppColors.primary),
       ),
 
-      // Any Card that was not changed to GlassCard still looks like glass.
+      // Regular Cards share the same light surface and soft outline.
       cardTheme: CardThemeData(
-        color: Colors.white.withValues(alpha: 0.6),
+        color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+          side: const BorderSide(color: AppColors.border),
         ),
       ),
 
-      // Text fields: a little see-through.
+      // Opaque inputs stay distinct from the light background.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.75),
+        fillColor: Colors.white,
         border: roundedBorder,
         enabledBorder: roundedBorder,
         focusedBorder: OutlineInputBorder(
@@ -110,16 +117,16 @@ class AppTheme {
       ),
 
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white.withValues(alpha: 0.95),
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: Colors.white.withValues(alpha: 0.95),
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
       ),
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white.withValues(alpha: 0.75),
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0xFFDCEDE0),
 

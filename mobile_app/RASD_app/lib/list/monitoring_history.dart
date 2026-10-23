@@ -1,24 +1,52 @@
 import 'package:flutter/material.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
-import '../data/mock_data.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class MonitoringHistoryPage extends StatelessWidget {
+  final String farmId;
   final String palmId;
 
   const MonitoringHistoryPage({
     super.key,
+    required this.farmId,
     required this.palmId,
   });
 
-  List<Map<String, String>> get _sampleRecords =>
-      MockData.monitoringEventsForPalm(palmId).map((alert) => {
-        'date': '${alert.createdAt.day}/${alert.createdAt.month}/${alert.createdAt.year}',
-        'time': '${alert.createdAt.hour.toString().padLeft(2, '0')}:${alert.createdAt.minute.toString().padLeft(2, '0')}',
-        'result': alert.type == AlertType.suspected
-            ? 'Possible Pest Detected'
-            : alert.type == AlertType.monitoring ? 'Under Monitoring' : 'Sensor Offline',
-      }).toList();
+  List<Map<String, String>> _recordsFromData(Object? data) {
+    if (data is! Map) return [];
+
+    final records = <Map<String, String>>[];
+    for (final entry in data.entries) {
+      if (entry.value is! Map) continue;
+      final value = Map<Object?, Object?>.from(entry.value as Map);
+      final rawTimestamp = value['timestamp'];
+      final number = rawTimestamp is num
+          ? rawTimestamp.toInt()
+          : int.tryParse(rawTimestamp?.toString() ?? '');
+      if (number == null) continue;
+
+      final dateTime = DateTime.fromMillisecondsSinceEpoch(
+        number < 100000000000 ? number * 1000 : number,
+      ).toLocal();
+      final status = (value['healthStatus'] ?? '').toString();
+      final result = switch (status.toLowerCase()) {
+        'suspected' => 'Possible Pest Detected',
+        'undermonitoring' || 'monitoring' => 'Under Monitoring',
+        'healthy' => 'Healthy',
+        _ => 'Unknown',
+      };
+      records.add({
+        'date': '${dateTime.day}/${dateTime.month}/${dateTime.year}',
+        'time': '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}',
+        'result': result,
+        'timestamp': number.toString(),
+      });
+    }
+    records.sort((a, b) => int.parse(b['timestamp']!)
+        .compareTo(int.parse(a['timestamp']!)));
+    return records;
+  }
 
   bool _isPestDetected(String result) {
     return result == 'Possible Pest Detected';
@@ -68,20 +96,35 @@ class MonitoringHistoryPage extends StatelessWidget {
             ),
 
             Expanded(
-              child: _sampleRecords.isEmpty
-                  ? const Center(child: GlassLabel(child: Text('No monitoring events yet.')))
-                  : ListView.separated(
+              child: StreamBuilder<DatabaseEvent>(
+                stream: FirebaseDatabase.instance
+                    .ref('monitoringHistory/$farmId/$palmId')
+                    .onValue,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: GlassLabel(child: Text('Unable to load monitoring history.')),
+                    );
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final records = _recordsFromData(snapshot.data!.snapshot.value);
+                  return records.isEmpty
+                      ? const Center(child: GlassLabel(child: Text('No monitoring events yet.')))
+                      : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
                   20,
                   0,
                   20,
                   24,
                 ),
-                itemCount: _sampleRecords.length,
+                itemCount: records.length,
                 separatorBuilder: (_, __) =>
                 const SizedBox(height: 10),
                 itemBuilder: (context, index) {
-                  final record = _sampleRecords[index];
+                  final record = records[index];
                   final result = record['result']!;
                   final isDetected = _isPestDetected(result);
 
@@ -167,6 +210,8 @@ class MonitoringHistoryPage extends StatelessWidget {
                       ),
                     ),
                   );
+                },
+              );
                 },
               ),
             ),

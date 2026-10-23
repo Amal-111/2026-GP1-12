@@ -1,10 +1,7 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-/// Plain see-through page. The palm background and the glass colors
-/// come from the app theme (see app_theme.dart), so every page in the
-/// app looks the same.
+/// Shared page layout; the light background is supplied by the theme.
 class PalmScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBar;
   final Widget body;
@@ -21,27 +18,21 @@ class PalmScaffold extends StatelessWidget {
   }
 }
 
-/// Palm photo behind every page. Used by the page transitions in
-/// app_theme.dart, so each screen gets it automatically.
+/// Soft neutral background shared by all routes. Welcome draws its own photo.
 class PalmBackground extends StatelessWidget {
   final Widget child;
   const PalmBackground({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/images/palm_background.jpg'),
-          fit: BoxFit.cover,
-        ),
-      ),
+    return ColoredBox(
+      color: AppColors.background,
       child: child,
     );
   }
 }
 
-/// Page transition that puts the palm background behind each page.
+/// Preserve the existing navigation transition with the shared background.
 class PalmPageTransitionsBuilder extends PageTransitionsBuilder {
   const PalmPageTransitionsBuilder();
 
@@ -63,16 +54,16 @@ class PalmPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
-/// White see-through button style; more solid on hover or press.
+/// Light button style with a clear border.
 final ButtonStyle glassButtonStyle = ButtonStyle(
   backgroundColor: WidgetStateProperty.resolveWith((states) {
     if (states.contains(WidgetState.disabled)) {
-      return Colors.white.withValues(alpha: 0.3);
+      return Colors.white.withValues(alpha: 0.65);
     }
     final active = states.contains(WidgetState.hovered) ||
         states.contains(WidgetState.pressed) ||
         states.contains(WidgetState.focused);
-    return Colors.white.withValues(alpha: active ? 0.92 : 0.6);
+    return Colors.white.withValues(alpha: active ? 1.0 : 0.97);
   }),
   foregroundColor: const WidgetStatePropertyAll(AppColors.primary),
   iconColor: const WidgetStatePropertyAll(AppColors.primary),
@@ -82,11 +73,11 @@ final ButtonStyle glassButtonStyle = ButtonStyle(
   elevation: const WidgetStatePropertyAll(0),
   shadowColor: const WidgetStatePropertyAll(Colors.transparent),
   side: WidgetStatePropertyAll(
-    BorderSide(color: Colors.white.withValues(alpha: 0.8)),
+    BorderSide(color: AppColors.border),
   ),
 );
 
-/// Transparent AppBar that matches the glass boxes.
+/// Quiet light header; keep the existing title and navigation layout.
 AppBar glassAppBar({
   required String title,
   Widget? leading,
@@ -96,14 +87,13 @@ AppBar glassAppBar({
     title: Text(title),
     leading: leading,
     actions: actions,
-    backgroundColor: Colors.white.withValues(alpha: 0.6),
+    backgroundColor: AppColors.background,
     surfaceTintColor: Colors.transparent,
     scrolledUnderElevation: 0,
   );
 }
 
-/// A see-through box that becomes more solid when the mouse is over it,
-/// when it is pressed, or when a field inside it is being typed in.
+/// Solid white card with a subtle border and shadow.
 class GlassBox extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -146,23 +136,22 @@ class _GlassBoxState extends State<GlassBox> {
           canRequestFocus: false,
           skipTraversal: true,
           onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: widget.padding,
-                decoration: BoxDecoration(
-                  color: widget.tint.withValues(alpha: _active ? 0.92 : 0.55),
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: widget.padding,
+            decoration: BoxDecoration(
+              color: widget.tint.withValues(alpha: _active ? 1.0 : 0.98),
+              borderRadius: radius,
+              border: Border.all(color: AppColors.border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0D000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
                 ),
-                child: widget.child,
-              ),
+              ],
             ),
+            child: widget.child,
           ),
         ),
       ),
@@ -170,8 +159,7 @@ class _GlassBoxState extends State<GlassBox> {
   }
 }
 
-/// Small glass box for a title or a line of text that sits on the
-/// background photo, so it is easy to read.
+/// Small readable label using the same card styling.
 class GlassLabel extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -188,7 +176,7 @@ class GlassLabel extends StatelessWidget {
   }
 }
 
-/// Drop-in replacement for Flutter's Card with the glass look.
+/// Shared card wrapper with the original padding and ink interactions.
 /// Change `Card(` to `GlassCard(` and keep the same child and margin.
 class GlassCard extends StatelessWidget {
   final Widget? child;

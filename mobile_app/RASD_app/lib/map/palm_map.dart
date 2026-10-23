@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
 import '../theme/palm_icon.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,7 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../list/palm_details.dart';
-import '../data/mock_data.dart';
+import '../services/selected_farm_service.dart';
 import 'map_tiles.dart';
 
 /// Farm map: real map (satellite or street) with a marker for each palm.
@@ -25,72 +27,171 @@ class _FarmMapPageState extends State<FarmMapPage> {
   MapPalm? selectedPalm;
   bool _satellite = true;
 
+  final FirebaseDatabase _db = FirebaseDatabase.instance;
+  StreamSubscription<DatabaseEvent>? _palmsSubscription;
+  StreamSubscription<DatabaseEvent>? _farmSubscription;
+  StreamSubscription<DatabaseEvent>? _devicesSubscription;
+  List<MapPalm> _palms = [];
+  Map<String, dynamic> _devices = {};
+  String _farmName = 'Farm Map';
+  LatLng? _farmCenter;
+  bool _loadedPalms = false;
+
+  String get activeFarmId => widget.farmId ?? SelectedFarmService.farmId;
+
   @override
   void initState() {
     super.initState();
-    MockData.changes.addListener(_refresh);
-    if (widget.highlightedPalmId != null) {
-      for (final palm in palms) {
-        if (palm.id == widget.highlightedPalmId) {
-          selectedPalm = palm;
-          break;
-        }
-      }
+    _watchFarm();
+  }
+
+  @override
+  void didUpdateWidget(covariant FarmMapPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.farmId != widget.farmId) {
+      _watchFarm();
     }
   }
 
-  void _refresh() {
-    if (mounted) {
+  Map<String, dynamic> _asMap(Object? value) {
+    if (value is! Map) return {};
+    return Map<String, dynamic>.from(value);
+  }
+
+  double? _coordinate(Object? value) {
+    final result = value is num ? value.toDouble() : double.tryParse('$value');
+    return result?.isFinite == true ? result : null;
+  }
+
+  String _status(Object? value) {
+    switch ((value ?? '').toString().replaceAll('_', '').replaceAll(' ', '').toLowerCase()) {
+      case 'healthy':
+        return 'Healthy';
+      case 'suspected':
+        return 'Suspected';
+      case 'monitoring':
+      case 'undermonitoring':
+        return 'Monitoring';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  void _watchFarm() {
+    _palmsSubscription?.cancel();
+    _farmSubscription?.cancel();
+    _devicesSubscription?.cancel();
+    _palms = [];
+    _devices = {};
+    _loadedPalms = false;
+    _farmName = 'Farm Map';
+    _farmCenter = null;
+
+    final farmId = activeFarmId;
+    _farmSubscription = _db.ref('farms/$farmId').onValue.listen((event) {
+      final data = _asMap(event.snapshot.value);
+      final lat = _coordinate(data['latitude']);
+      final lng = _coordinate(data['longitude']);
+      if (!mounted) return;
       setState(() {
-        if (selectedPalm != null) {
-          final matches = palms.where((p) => p.id == selectedPalm!.id);
-          selectedPalm = matches.isEmpty ? null : matches.first;
+        _farmName = (data['farmName'] ?? 'Farm Map').toString();
+        if (lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          _farmCenter = LatLng(lat, lng);
         }
       });
-    }
+      if (_loadedPalms && _palms.isEmpty && _farmCenter != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showWholeFarm(_palms);
+        });
+      }
+    });
+
+    _devicesSubscription = _db.ref('monitoringDevices').onValue.listen((event) {
+      if (!mounted) return;
+      setState(() => _devices = _asMap(event.snapshot.value));
+      _refreshPalmStatuses();
+    });
+
+    _palmsSubscription = _db.ref('palms/$farmId').onValue.listen((event) {
+      final value = _asMap(event.snapshot.value);
+      final used = <String, int>{};
+      final result = <MapPalm>[];
+      for (final entry in value.entries) {
+        final data = _asMap(entry.value);
+        final lat = _coordinate(data['latitude']);
+        final lng = _coordinate(data['longitude']);
+        if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+        final key = '$lat,$lng';
+        final repeat = used[key] ?? 0;
+        used[key] = repeat + 1;
+        result.add(MapPalm(
+          id: entry.key,
+          status: _status(data['healthStatus']),
+          deviceId: (data['deviceId'] ?? '').toString(),
+          point: LatLng(lat + repeat * 0.00004, lng + repeat * 0.00004),
+        ));
+      }
+      if (!mounted) return;
+      final wasLoaded = _loadedPalms;
+      setState(() {
+        _palms = result;
+        _loadedPalms = true;
+        if (selectedPalm != null) {
+          for (final palm in result) {
+            if (palm.id == selectedPalm!.id) {
+              selectedPalm = palm;
+              break;
+            }
+          }
+          if (!result.any((p) => p.id == selectedPalm?.id)) selectedPalm = null;
+        } else if (widget.highlightedPalmId != null) {
+          for (final palm in result) {
+            if (palm.id == widget.highlightedPalmId) {
+              selectedPalm = palm;
+              break;
+            }
+          }
+        }
+      });
+      _refreshPalmStatuses();
+      if (!wasLoaded) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (selectedPalm != null) {
+            _mapController.move(selectedPalm!.point, 18);
+          } else {
+            _showWholeFarm(_palms);
+          }
+        });
+      }
+    });
+  }
+
+  void _refreshPalmStatuses() {
+    if (!mounted || _palms.isEmpty) return;
+    setState(() {
+      _palms = _palms.map((palm) {
+        final device = _asMap(_devices[palm.deviceId]);
+        final offline = palm.deviceId.isNotEmpty &&
+            device['connectionStatus']?.toString().toLowerCase() == 'offline';
+        return palm.copyWith(displayStatus: offline ? 'Offline' : palm.status);
+      }).toList();
+      if (selectedPalm != null) {
+        final matches = _palms.where((p) => p.id == selectedPalm!.id);
+        selectedPalm = matches.isEmpty ? null : matches.first;
+      }
+    });
   }
 
   @override
   void dispose() {
-    MockData.changes.removeListener(_refresh);
+    _palmsSubscription?.cancel();
+    _farmSubscription?.cancel();
+    _devicesSubscription?.cancel();
     super.dispose();
   }
 
-  String get activeFarmId => MockData.currentUser.role == UserRole.farmer
-      ? (MockData.currentUser.farmId ?? '')
-      : (widget.farmId ?? MockData.selectedFarmId);
-
-  /// Palms of the farm with their real location from MockData.
-  List<MapPalm> get palms {
-    final data = MockData.palmsForFarm(activeFarmId);
-    final used = <String, int>{};
-    final result = <MapPalm>[];
-
-    for (final palm in data) {
-      final point = RasdMap.parse(palm.location);
-      if (point == null) continue;
-
-      // Two palms with the exact same location: move the second one a
-      // little so both markers can be tapped.
-      final key = palm.location.trim();
-      final repeat = used[key] ?? 0;
-      used[key] = repeat + 1;
-
-      result.add(MapPalm(
-        id: palm.id,
-        status: !palm.deviceOnline
-            ? 'Offline'
-            : palm.status == PalmStatus.underMonitoring
-                ? 'Monitoring'
-                : palmStatusLabel(palm.status),
-        point: LatLng(
-          point.latitude + repeat * 0.00004,
-          point.longitude + repeat * 0.00004,
-        ),
-      ));
-    }
-    return result;
-  }
+  List<MapPalm> get palms => _palms;
 
   Color statusColor(String status) {
     switch (status) {
@@ -111,7 +212,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PalmDetailsPage(palmId: palm.id),
+        builder: (_) => PalmDetailsPage(farmId: activeFarmId, palmId: palm.id),
       ),
     );
   }
@@ -119,7 +220,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
   /// Moves the map so all palms of the farm can be seen.
   void _showWholeFarm(List<MapPalm> list) {
     if (list.isEmpty) {
-      _mapController.move(RasdMap.farmCenter, 17);
+      _mapController.move(_farmCenter ?? RasdMap.farmCenter, 17);
     } else if (list.length == 1) {
       _mapController.move(list.first.point, 18);
     } else {
@@ -134,9 +235,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
   @override
   Widget build(BuildContext context) {
     final list = palms;
-    final farmName = MockData.farms.any((f) => f.id == activeFarmId)
-        ? MockData.farms.firstWhere((f) => f.id == activeFarmId).name
-        : 'Farm Map';
+    final farmName = _farmName;
 
     return Scaffold(
       appBar: AppBar(
@@ -157,7 +256,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
                   mapController: _mapController,
                   options: MapOptions(
                     initialCenter: selectedPalm?.point ??
-                        (list.isEmpty ? RasdMap.farmCenter : list.first.point),
+                        (list.isEmpty ? (_farmCenter ?? RasdMap.farmCenter) : list.first.point),
                     initialZoom: 17,
                     initialCameraFit: selectedPalm == null && list.length > 1
                         ? CameraFit.bounds(
@@ -185,7 +284,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
                           child: GestureDetector(
                             onTap: () => setState(() => selectedPalm = palm),
                             child: _PalmMarker(
-                              color: statusColor(palm.status),
+                              color: statusColor(palm.displayStatus),
                               selected: selected,
                             ),
                           ),
@@ -245,7 +344,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
                     top: 12,
                     child: _PalmInfoCard(
                       palm: selectedPalm!,
-                      color: statusColor(selectedPalm!.status),
+                      color: statusColor(selectedPalm!.displayStatus),
                       onClose: () => setState(() => selectedPalm = null),
                       onViewDetails: () => openPalmDetails(selectedPalm!),
                     ),
@@ -272,11 +371,22 @@ class MapPalm {
   final String id;
   final String status;
   final LatLng point;
+  final String deviceId;
+  final String? displayStatusOverride;
+
+  String get displayStatus => displayStatusOverride ?? status;
+
+  MapPalm copyWith({String? displayStatus}) => MapPalm(
+    id: id, status: status, deviceId: deviceId, point: point,
+    displayStatusOverride: displayStatus,
+  );
 
   const MapPalm({
     required this.id,
     required this.status,
     required this.point,
+    required this.deviceId,
+    this.displayStatusOverride,
   });
 }
 
@@ -359,7 +469,7 @@ class _PalmInfoCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(
-                      palm.status,
+                      palm.displayStatus,
                       style: TextStyle(
                         fontFamily: 'Cairo',
                         fontSize: 13,

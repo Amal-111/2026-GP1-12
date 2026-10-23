@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
-import 'connect_sensor_page.dart';
+import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 import 'farm_location_picker.dart';
+import 'connect_sensor_page.dart';
 
 /// Add New Palm: step 1 (palm information) and step 2 (location).
 /// Step 3 (connect sensor) is on ConnectSensorPage.
@@ -25,15 +26,8 @@ class _AddPalmPageState extends State<AddPalmPage> {
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
 
-  late final String _palmId;
   String? _type;
   int _step = 0; // 0 = information, 1 = location
-
-  @override
-  void initState() {
-    super.initState();
-    _palmId = _store.nextPalmId();
-  }
 
   @override
   void dispose() {
@@ -65,23 +59,16 @@ class _AddPalmPageState extends State<AddPalmPage> {
     final lat = double.parse(_latController.text.trim());
     final lng = double.parse(_lngController.text.trim());
 
-    final connected = await Navigator.push<bool>(
+    final added = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ConnectSensorPage(
-          palmId: _palmId,
           age: int.parse(_ageController.text.trim()),
-          type: _type!,
-          latitude: lat,
-          longitude: lng,
+          type: _type!, latitude: lat, longitude: lng,
         ),
       ),
     );
-
-    // Palm was added -> go back to the list.
-    if (connected == true && mounted) {
-      Navigator.pop(context, true);
-    }
+    if (added == true && mounted) Navigator.pop(context, true);
   }
 
   void _back() {
@@ -133,7 +120,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _next,
-                    child: const Text('Next'),
+                    child: Text(_step == 0 ? 'Next' : 'Next: Connect Sensor'),
                   ),
                 ),
               ),
@@ -153,11 +140,11 @@ class _AddPalmPageState extends State<AddPalmPage> {
           const _FieldLabel('Palm ID'),
           // Given by the system, cannot be changed here.
           TextFormField(
-            initialValue: _palmId,
+            initialValue: 'Assigned on save',
             readOnly: true,
             enabled: false,
             decoration: const InputDecoration(
-              helperText: 'Assigned automatically by the system',
+              helperText: 'Final ID assigned automatically when saved',
               prefixIcon: Icon(Icons.tag),
             ),
           ),

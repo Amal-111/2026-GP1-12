@@ -4,7 +4,7 @@ import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import 'assign_farmer_page.dart';
-import 'edit_farmer_page.dart';
+import '../services/rasd_management_service.dart';
 
 class ManageFarmersPage extends StatefulWidget {
   const ManageFarmersPage({super.key});
@@ -22,10 +22,10 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     super.dispose();
   }
 
-  List<FarmerData> get _filteredFarmers {
+  List<FarmerData> _filteredFarmers(List<FarmerData> allFarmers) {
     final query = _searchController.text.trim().toLowerCase();
 
-    return MockData.farmersForFarm().where((farmer) {
+    return allFarmers.where((farmer) {
       return query.isEmpty ||
           farmer.name.toLowerCase().contains(query) ||
           farmer.email.toLowerCase().contains(query);
@@ -40,10 +40,9 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete ${farmer.name}?'),
+        title: Text('Remove ${farmer.name}?'),
         content: const Text(
-          'Are you sure you want to delete this farmer? '
-              'This action cannot be undone.',
+          'Remove this farmer from your farm? Their account will not be deleted.',
         ),
         actions: [
           TextButton(
@@ -62,10 +61,11 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     );
 
     if (confirmed == true) {
-      MockData.deleteFarmer(farmer);
-
-      if (mounted) {
-        _showMessage('Farmer deleted successfully.');
+      try {
+        await RasdManagementService.removeFarmer(farmer.id);
+        if (mounted) _showMessage('Farmer removed successfully.');
+      } catch (error) {
+        if (mounted) showCenterMessage(context, error.toString(), success: false);
       }
     }
   }
@@ -77,10 +77,12 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
         title: 'Manage Farmers',
       ),
       body: SafeArea(
-        child: ListenableBuilder(
-          listenable: MockData.changes,
-          builder: (context, _) {
-            final farmers = _filteredFarmers;
+        child: StreamBuilder<List<FarmerData>>(
+          stream: RasdManagementService.watchFarmers(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final farmers = _filteredFarmers(snapshot.data!);
 
             return Column(
               children: [
@@ -98,11 +100,11 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
                         );
 
                         if (assigned == true && mounted) {
-                          _showMessage('Farmer assigned successfully.');
+                          _showMessage('Invitation sent successfully.');
                         }
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Farmer'),
+                      label: const Text('Invite Farmer'),
                     ),
                   ),
                 ),
@@ -185,26 +187,6 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
                 ),
               ],
             ),
-          ),
-
-          IconButton(
-            onPressed: () async {
-              final saved = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EditFarmerPage(
-                    farmer: farmer,
-                  ),
-                ),
-              );
-
-              if (saved == true && mounted) {
-                _showMessage('Farmer information updated successfully.');
-              }
-            },
-            icon: const Icon(Icons.edit_outlined),
-            color: AppColors.primary,
-            tooltip: 'Edit',
           ),
 
           IconButton(

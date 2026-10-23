@@ -46,3 +46,22 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Generated build files
+android/build/
+build/
+.dart_tool/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.service-account.json
+serviceAccountKey.json
+firebase-debug.log
+database-debug.log
+ui-debug.log
+
+# Firebase Emulator data
+.firebase/
+firebase-export/

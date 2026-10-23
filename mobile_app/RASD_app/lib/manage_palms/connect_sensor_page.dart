@@ -4,13 +4,11 @@ import '../theme/app_colors.dart';
 import 'palm_store.dart';
 import 'add_palm_page.dart';
 import '../theme/glass_widgets.dart';
-import 'farm_location_picker.dart';
-
+import '../services/rasd_management_service.dart';
 /// Step 3 of adding a palm: connect its monitoring sensor.
 /// A palm cannot be added without a sensor, so the palm is saved
 /// only when "Connect Sensor" succeeds.
 class ConnectSensorPage extends StatefulWidget {
-  final String palmId;
   final int age;
   final String type;
   final double latitude;
@@ -18,7 +16,6 @@ class ConnectSensorPage extends StatefulWidget {
 
   const ConnectSensorPage({
     super.key,
-    required this.palmId,
     required this.age,
     required this.type,
     required this.latitude,
@@ -34,52 +31,38 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
   final _formKey = GlobalKey<FormState>();
 
   final _deviceController = TextEditingController();
-  late final TextEditingController _latController;
-  late final TextEditingController _lngController;
-
-  bool _sameAsPalm = true;
   String? _deviceError;
-
-  @override
-  void initState() {
-    super.initState();
-    _latController = TextEditingController(text: '${widget.latitude}');
-    _lngController = TextEditingController(text: '${widget.longitude}');
-  }
 
   @override
   void dispose() {
     _deviceController.dispose();
-    _latController.dispose();
-    _lngController.dispose();
     super.dispose();
   }
 
-  void _connect() {
-    setState(() => _deviceError = _store.checkDevice(_deviceController.text));
+  bool _saving = false;
+
+  Future<void> _connect() async {
     final formOk = _formKey.currentState!.validate();
-    if (!formOk || _deviceError != null) return;
+    final number = _deviceController.text.trim();
+    setState(() => _deviceError = number.isNotEmpty && PalmStore.isDigits(number)
+        ? null : 'Device ID must be a number.');
+    if (!formOk || _deviceError != null || _saving) return;
 
-    final sensorLat = _sameAsPalm
-        ? widget.latitude
-        : double.parse(_latController.text.trim());
-    final sensorLng = _sameAsPalm
-        ? widget.longitude
-        : double.parse(_lngController.text.trim());
-
-    // Saved in the team's shared data (MockData).
-    _store.addPalm(
-      id: widget.palmId,
-      age: widget.age,
-      type: widget.type,
-      latitude: widget.latitude,
-      longitude: widget.longitude,
-      deviceNumber: _deviceController.text,
-      sensorLatitude: sensorLat,
-      sensorLongitude: sensorLng,
-    );
-
-    Navigator.pop(context, true);
+    // Sensor IDs follow the existing D### naming convention.
+    final deviceId = 'D${number.padLeft(3, '0')}';
+    setState(() => _saving = true);
+    try {
+      await RasdManagementService.addPalm(
+        age: widget.age, type: widget.type,
+        latitude: widget.latitude, longitude: widget.longitude,
+        deviceId: deviceId,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) showCenterMessage(context, error.toString(), success: false);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -129,48 +112,7 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                           errorText: _deviceError,
                         ),
                       ),
-                      const SizedBox(height: 22),
-                      Text('Sensor Location',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: _sameAsPalm,
-                        activeThumbColor: AppColors.primary,
-                        title: const Text('Same as palm location'),
-                        onChanged: (v) => setState(() => _sameAsPalm = v),
-                      ),
-                      if (!_sameAsPalm) ...[
-                        FarmLocationPicker(
-                          pinIcon: Icons.sensors_rounded,
-                          latitude:
-                              double.tryParse(_latController.text.trim()),
-                          longitude:
-                              double.tryParse(_lngController.text.trim()),
-                          onPicked: (point) => setState(() {
-                            _latController.text = '${point.latitude}';
-                            _lngController.text = '${point.longitude}';
-                          }),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          onChanged: (_) => setState(() {}),
-                          controller: _latController,
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          validator: PalmValidators.latitude,
-                          decoration:
-                              const InputDecoration(labelText: 'Latitude'),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _lngController,
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          validator: PalmValidators.longitude,
-                          onChanged: (_) => setState(() {}),
-                          decoration:
-                              const InputDecoration(labelText: 'Longitude'),
-                        ),
                       ],
-                          ],
                         ),
                       ),
                     ],
@@ -183,7 +125,7 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _connect,
+                  onPressed: _saving ? null : _connect,
                   icon: const Icon(Icons.link_rounded),
                   label: const Text('Connect Sensor'),
                 ),
@@ -220,7 +162,7 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Linked to palm ${widget.palmId}',
+                Text('Palm ID assigned after sensor pairing',
                     style: Theme.of(context).textTheme.titleSmall),
                 Text(
                   '${widget.type} · ${widget.age} yrs',

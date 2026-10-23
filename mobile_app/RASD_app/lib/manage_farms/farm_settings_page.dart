@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/mock_data.dart';
+import '../services/rasd_management_service.dart';
 import '../manage_palms/farm_location_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
@@ -84,39 +85,21 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     });
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
     final name = _nameController.text.trim();
-    final description = _descriptionController.text.trim();
-
-    if (name.isEmpty) {
-      showCenterMessage(
-        context,
-        'Please enter the farm name.',
-        success: false,
-      );
+    if (name.isEmpty || _latitude == null || _longitude == null) {
+      showCenterMessage(context, 'Please enter a farm name and location.', success: false);
       return;
     }
-
-    final location =
-    _latitude != null && _longitude != null
-        ? '${_latitude!.toStringAsFixed(6)}, '
-        '${_longitude!.toStringAsFixed(6)}'
-        : MockData.selectedFarm.location;
-
-    MockData.updateFarm(
-      MockData.selectedFarm,
-      name: name,
-      description: description,
-      location: location,
-      imagePath: _imagePath,
-      latitude: _latitude,
-      longitude: _longitude,
-    );
-
-    showCenterMessage(
-      context,
-      'Farm information updated successfully.',
-    );
+    try {
+      await RasdManagementService.updateFarm(name: name,
+        description: _descriptionController.text.trim(),
+        latitude: _latitude!, longitude: _longitude!);
+      if (!mounted) return;
+      showCenterMessage(context, 'Farm information updated successfully.');
+    } catch (error) {
+      if (mounted) showCenterMessage(context, error.toString(), success: false);
+    }
   }
 
   Future<void> _confirmDeleteFarm() async {
@@ -150,7 +133,13 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
     if (confirmed != true || !mounted) return;
 
-    MockData.deleteFarm(farm);
+    try {
+      await RasdManagementService.deleteFarm();
+    } catch (error) {
+      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      return;
+    }
+    if (!mounted) return;
 
     Navigator.popUntil(
       context,

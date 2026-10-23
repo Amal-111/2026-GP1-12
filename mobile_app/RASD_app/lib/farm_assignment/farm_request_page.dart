@@ -1,202 +1,75 @@
 import 'package:flutter/material.dart';
-
-import '../data/auth_store.dart';
-import '../data/mock_data.dart';
-import '../theme/app_colors.dart';
+import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
-import '../theme/palm_icon.dart';
 
-/// The farmer chooses a farm and sends a request to its owner.
-/// Pops with `true` when the request was sent.
+/// Farmer accepts or rejects invitations sent by farm owners.
 class FarmRequestPage extends StatefulWidget {
   const FarmRequestPage({super.key});
-
   @override
   State<FarmRequestPage> createState() => _FarmRequestPageState();
 }
 
 class _FarmRequestPageState extends State<FarmRequestPage> {
-  final TextEditingController _searchController = TextEditingController();
-  String? _selectedFarmId;
+  bool _busy = false;
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  List<RasdFarm> get _filteredFarms {
-    final query = _searchController.text.trim().toLowerCase();
-
-    return MockData.farms.where((farm) {
-      return query.isEmpty || farm.name.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  void _sendRequest() {
-    if (_selectedFarmId == null) {
-      showCenterMessage(context, 'Please select a farm.', success: false);
-      return;
+  Future<void> _respond(String id, {required bool accept}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (accept) {
+        await RasdManagementService.acceptInvitation(id);
+      } else {
+        await RasdManagementService.rejectInvitation(id);
+      }
+      if (mounted && accept) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) showCenterMessage(context, error.toString(), success: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-
-    AuthStore.sendRequest(_selectedFarmId!);
-    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final farms = _filteredFarms;
-
     return PalmScaffold(
-      appBar: glassAppBar(
-        title: 'Farm Assignment Request',
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-              child: Column(
+      appBar: glassAppBar(title: 'Farm Invitations'),
+      body: SafeArea(child: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: RasdManagementService.watchMyInvitations(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final invitations = snapshot.data!;
+          if (invitations.isEmpty) return const Center(
+            child: GlassBox(child: Text('No pending invitations')));
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            itemCount: invitations.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final invitation = invitations[index];
+              final id = invitation['id'].toString();
+              return GlassBox(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GlassLabel(
-                    child: Text(
-                      'Choose the farm you work at. The farm owner will '
-                      'receive your request and approve it.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      hintText: 'Search for a farm...',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  ),
+                  Text('Farm Invitation', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text('Farm ID: ${invitation['farmId']}'),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: OutlinedButton(
+                      onPressed: _busy ? null : () => _respond(id, accept: false),
+                      child: const Text('Reject'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton(
+                      onPressed: _busy ? null : () => _respond(id, accept: true),
+                      child: const Text('Accept'))),
+                  ]),
                 ],
-              ),
-            ),
-
-            Expanded(
-              child: farms.isEmpty
-                  ? Center(
-                      child: GlassBox(
-                        child: Text(
-                          'No farms found',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      itemCount: farms.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final farm = farms[index];
-                        final selected = _selectedFarmId == farm.id;
-
-                        return GlassBox(
-                          padding: EdgeInsets.zero,
-                          tint: selected
-                              ? const Color(0xFFDCEDE0)
-                              : Colors.white,
-                          child: Material(
-                            type: MaterialType.transparency,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () =>
-                                  setState(() => _selectedFarmId = farm.id),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: SizedBox(
-                                        width: 60,
-                                        height: 60,
-                                        child: farm.imagePath.isEmpty
-                                            ? _imageFallback()
-                                            : Image.asset(
-                                                farm.imagePath,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    _imageFallback(),
-                                              ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            farm.name,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${farm.palmCount} Palms · '
-                                            '${farm.farmerCount} '
-                                            '${farm.farmerCount == 1 ? 'Farmer' : 'Farmers'}',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      selected
-                                          ? Icons.radio_button_checked
-                                          : Icons.radio_button_unchecked,
-                                      color: selected
-                                          ? AppColors.primary
-                                          : AppColors.textSecondary,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _sendRequest,
-                  child: const Text('Send Request'),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _imageFallback() {
-    return Container(
-      color: AppColors.beige,
-      alignment: Alignment.center,
-      child: const PalmIcon(size: 34, color: AppColors.primary),
+              ));
+            },
+          );
+        },
+      )),
     );
   }
 }

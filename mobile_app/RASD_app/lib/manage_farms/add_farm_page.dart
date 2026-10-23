@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../data/mock_data.dart';
+import '../services/rasd_farms_service.dart';
 import '../manage_palms/farm_location_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
@@ -23,17 +23,11 @@ class _AddFarmPageState extends State<AddFarmPage> {
   final _descriptionController = TextEditingController();
   final _palmCountController = TextEditingController();
 
-  late final String _farmId;
+  bool _saving = false;
 
   String _imagePath = '';
   double? _latitude;
   double? _longitude;
-
-  @override
-  void initState() {
-    super.initState();
-    _farmId = MockData.nextFarmId();
-  }
 
   @override
   void dispose() {
@@ -77,36 +71,59 @@ class _AddFarmPageState extends State<AddFarmPage> {
     });
   }
 
-  void _addFarm() {
-    if (!_formKey.currentState!.validate()) return;
-
+  Future<void> _addFarm() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
     if (_latitude == null || _longitude == null) {
-      showCenterMessage(
-        context,
-        'Please select the farm location.',
-        success: false,
-      );
+      showCenterMessage(context, 'Please select the farm location.', success: false);
       return;
     }
+    setState(() => _saving = true);
+    try {
 
-    final farm = RasdFarm(
-      _farmId,
-      _nameController.text.trim(),
-      location:
-      '${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
-      imagePath: _imagePath,
-      description: _descriptionController.text.trim(),
-      latitude: _latitude,
-      longitude: _longitude,
-      palmCount: int.parse(
-        _palmCountController.text.trim(),
-      ),
-      farmerCount: 0,
-    );
+      final farmId = await RasdFarmsService.createFarm(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        totalPalms: int.parse(_palmCountController.text.trim()),
+        latitude: _latitude!,
+        longitude: _longitude!,
+      );
 
-    MockData.addFarm(farm);
+      if (_imagePath.isNotEmpty) {
+        try {
+          final imageUrl = await RasdFarmsService.uploadFarmImage(
+            farmId: farmId,
+            imagePath: _imagePath,
+          );
 
-    Navigator.pop(context, true);
+          await RasdFarmsService.updateFarmImage(
+            farmId: farmId,
+            imageUrl: imageUrl,
+          );
+        } catch (error) {
+          debugPrint('Farm image upload failed: $error');
+
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Farm created, but the image could not be saved.',
+              ),
+            ),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not add farm: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Widget _buildFarmImage() {
@@ -320,8 +337,8 @@ class _AddFarmPageState extends State<AddFarmPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _addFarm,
-                  child: const Text('Add Farm'),
+                  onPressed: _saving ? null : _addFarm,
+                  child: Text(_saving ? 'Saving...' : 'Add Farm'),
                 ),
               ),
             ),

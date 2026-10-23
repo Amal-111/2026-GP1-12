@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
+import '../services/rasd_management_service.dart';
 import 'add_palm_page.dart';
 import 'edit_palm_page.dart';
 import '../theme/glass_widgets.dart';
@@ -24,9 +25,9 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     super.dispose();
   }
 
-  List<Palm> get _filteredPalms {
+  List<Palm> _filteredPalms(List<Palm> allPalms) {
     final query = _searchController.text.trim().toLowerCase();
-    return _store.palms.where((palm) {
+    return allPalms.where((palm) {
       return query.isEmpty ||
           palm.id.toLowerCase().contains(query) ||
           (palm.type ?? '').toLowerCase().contains(query);
@@ -90,8 +91,12 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     );
 
     if (confirmed == true) {
-      _store.deletePalm(palm);
-      if (mounted) _showMessage('Palm tree deleted successfully.');
+      try {
+        await RasdManagementService.deletePalm(palm);
+        if (mounted) _showMessage('Palm tree deleted successfully.');
+      } catch (error) {
+        if (mounted) showCenterMessage(context, error.toString(), success: false);
+      }
     }
   }
 
@@ -130,10 +135,12 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
         title: 'Manage Palms',
       ),
       body: SafeArea(
-        child: ListenableBuilder(
-          listenable: _store.changes,
-          builder: (context, _) {
-            final palms = _filteredPalms;
+        child: StreamBuilder<List<Palm>>(
+          stream: RasdManagementService.watchPalms(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final palms = _filteredPalms(snapshot.data!);
             return Column(
               children: [
                 Padding(
@@ -219,7 +226,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                     ),
                   ),
                   Text(
-                    '${palm.type ?? '-'} · ${palm.age == null ? '-' : '${palm.age} yrs'} · ${palm.deviceId}',
+                    '${palm.type ?? '-'} · ${palm.age == null ? '-' : '${palm.age} yrs'} · ${palm.deviceId.isEmpty ? 'No device' : palm.deviceId}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

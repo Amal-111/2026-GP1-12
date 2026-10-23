@@ -126,7 +126,7 @@ class MockData {
 
   static const farmer = RasdUser('Ahmed', UserRole.farmer, farmId: 'F001');
   static const owner = RasdUser('Sara', UserRole.farmOwner);
-  static const currentUser = owner; // owner;
+  static RasdUser currentUser = farmer; // owner;
   static final List<FarmerData> farmers = [
     FarmerData(
       id: 'FR001',

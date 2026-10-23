@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_database/firebase_database.dart';
 import '../data/mock_data.dart';
+import '../services/rasd_management_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
 import '../manage_palms/manage_palms_page.dart';
 import 'manage_farmers_page.dart';
 import 'farm_settings_page.dart';
+import 'invitations_page.dart';
 
 class FarmManagementPage extends StatelessWidget {
-  const FarmManagementPage({super.key});
+  final String farmId;
+
+  const FarmManagementPage({
+    super.key,
+    required this.farmId,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final farm = MockData.selectedFarm;
-    final palmCount = farm.palmCount;
+    return StreamBuilder<RasdFarm?>(
+      stream: RasdManagementService.watchFarm(farmId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Scaffold(body: Center(child: Text('${snapshot.error}')));
+        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        final farm = snapshot.data!;
+        final palmCount = farm.palmCount;
 
     return PalmScaffold(
       appBar: glassAppBar(
@@ -91,10 +103,51 @@ class FarmManagementPage extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            '${farm.farmerCount} ${farm.farmerCount == 1 ? 'Farmer' : 'Farmers'}',
-                            style: Theme.of(context).textTheme.titleMedium,
+
+                          StreamBuilder<DatabaseEvent>(
+                            stream: FirebaseDatabase.instance
+                                .ref('users')
+                                .orderByChild('farmId')
+                                .equalTo(farmId)
+                                .onValue,
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                return Text(
+                                  'Unable to load farmers',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                );
+                              }
+
+                              if (!snapshot.hasData) {
+                                return const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              }
+
+                              final value = snapshot.data!.snapshot.value;
+
+                              int farmerCount = 0;
+
+                              if (value is Map) {
+                                farmerCount = value.values.where((account) {
+                                  if (account is! Map) return false;
+
+                                  return account['role'] == 'Farmer' &&
+                                      account['farmId'] == farmId;
+                                }).length;
+                              }
+
+                              return Text(
+                                '$farmerCount ${farmerCount == 1 ? 'Farmer' : 'Farmers'}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              );
+                            },
                           ),
+
                         ],
                       ),
                     ),
@@ -148,6 +201,15 @@ class FarmManagementPage extends StatelessWidget {
               ),
 
               const SizedBox(height: 12),
+              SizedBox(width: double.infinity,
+                child: _ManagementCard(
+                  icon: const Icon(Icons.mail_outline, size: 42, color: AppColors.primary),
+                  title: 'Pending Invitations',
+                  onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const InvitationsPage())),
+                ),
+              ),
+              const SizedBox(height: 12),
 
             SizedBox(
               width: double.infinity,
@@ -172,6 +234,8 @@ class FarmManagementPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

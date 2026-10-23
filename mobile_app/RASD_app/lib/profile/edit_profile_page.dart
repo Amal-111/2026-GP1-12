@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_widgets.dart';
 import '../data/auth_store.dart';
+import '../services/firebase_auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 
@@ -35,21 +36,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final error = AuthStore.updateProfile(
-      name: _nameController.text,
-      email: _emailController.text,
-      phone: _phoneController.text,
-    );
-
-    if (error != null) {
-      showCenterMessage(context, error, success: false);
+  bool _busy = false;
+  Future<void> _save() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    if (_emailController.text.trim() != AuthStore.email) {
+      showCenterMessage(context, 'Email changes require a separate verification flow.', success: false);
       return;
     }
-
-    Navigator.pop(context, true);
+    setState(() => _busy = true);
+    try {
+      await RasdAuthService.updateProfile(name: _nameController.text, phone: _phoneController.text);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -123,7 +125,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _save,
+                  onPressed: _busy ? null : _save,
                   child: const Text('Save Changes'),
                 ),
               ),
