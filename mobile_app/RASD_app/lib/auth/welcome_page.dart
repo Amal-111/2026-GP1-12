@@ -1,3 +1,4 @@
+// Welcome screen: first page of the app with the Log In and Sign Up buttons.
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
