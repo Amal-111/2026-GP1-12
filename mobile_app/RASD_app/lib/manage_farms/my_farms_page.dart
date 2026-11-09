@@ -1,3 +1,4 @@
+// Lists the farms owned by the current user and opens the selected one.
 import 'package:flutter/material.dart';
 import '../services/selected_farm_service.dart';
 import '../data/mock_data.dart';
@@ -9,6 +10,7 @@ import 'farm_management_page.dart';
 import 'add_farm_page.dart';
 import '../profile/profile_page.dart';
 
+/// Page listing the user's farms.
 class MyFarmsPage extends StatelessWidget {
   const MyFarmsPage({super.key});
 
@@ -143,6 +145,7 @@ class MyFarmsPage extends StatelessWidget {
   }
 }
 
+/// Card showing one farm in the list.
 class _FarmCard extends StatelessWidget {
   final FarmRecord farm;
   final int palmCount;
@@ -226,6 +229,7 @@ class _FarmCard extends StatelessWidget {
     );
   }
 
+  /// Placeholder shown when the farm has no photo.
   Widget _buildImageFallback() {
     return Container(
       color: AppColors.beige,
