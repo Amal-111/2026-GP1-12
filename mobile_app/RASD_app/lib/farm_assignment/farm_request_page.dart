@@ -1,6 +1,8 @@
+// Shows the farm invitations a farmer received and lets them accept or decline.
 import 'package:flutter/material.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
+import '../services/rasd_errors.dart';
 
 /// Farmer accepts or rejects invitations sent by farm owners.
 class FarmRequestPage extends StatefulWidget {
@@ -10,8 +12,10 @@ class FarmRequestPage extends StatefulWidget {
 }
 
 class _FarmRequestPageState extends State<FarmRequestPage> {
+  /// True while a request is running (disables the button).
   bool _busy = false;
 
+  /// Accepts or declines an invitation, then refreshes the screen.
   Future<void> _respond(String id, {required bool accept}) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -23,7 +27,15 @@ class _FarmRequestPageState extends State<FarmRequestPage> {
       }
       if (mounted && accept) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      if (mounted) {
+        showRasdError(
+          context,
+          error,
+          title: accept
+              ? 'Could not accept the invitation'
+              : 'Could not reject the invitation',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
