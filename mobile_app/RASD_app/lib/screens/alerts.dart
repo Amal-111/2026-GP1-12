@@ -1,3 +1,4 @@
+// List of alerts for the selected farm.
 
 import 'package:flutter/material.dart';
 import '../theme/glass_widgets.dart';
@@ -5,6 +6,7 @@ import '../services/rasd_alert_service.dart';
 import '../theme/app_colors.dart';
 import 'alert_details.dart';
 
+/// Alerts page.
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key, required this.farmId});
 
@@ -15,6 +17,7 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
+  /// Turns a date into text like "5 min ago".
   String _timeAgo(DateTime? date) {
     if (date == null) return 'Date unavailable';
     final d = DateTime.now().difference(date.toLocal());
