@@ -1,9 +1,11 @@
+// Edit Palm screen: update a palm's age, type and location.
 
 import 'package:flutter/material.dart';
 
 import 'palm_store.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
+import '../services/rasd_errors.dart';
 
 /// Edit Palm: opens with the palm's current information filled in.
 /// Changes are applied only when "Save Changes" is pressed.
@@ -28,6 +30,7 @@ class _EditPalmPageState extends State<EditPalmPage> {
   String? _type;
   late String _status;
 
+  /// True while saving (disables the button).
   bool _isSaving = false;
 
   @override
@@ -63,6 +66,7 @@ class _EditPalmPageState extends State<EditPalmPage> {
         _type != palm.type;
   }
 
+  /// Validates the form and saves the changes.
   Future<void> _save() async {
     if (_isSaving) return;
 
@@ -73,8 +77,9 @@ class _EditPalmPageState extends State<EditPalmPage> {
     if (!_hasChanges) {
       showCenterMessage(
         context,
-        'No changes were made to this palm.',
+        'Change the age or the type, then tap Save.',
         success: false,
+        title: 'Nothing to save',
       );
       return;
     }
@@ -96,11 +101,7 @@ class _EditPalmPageState extends State<EditPalmPage> {
     } catch (error) {
       if (!mounted) return;
 
-      showCenterMessage(
-        context,
-        error.toString(),
-        success: false,
-      );
+      showRasdError(context, error, title: 'Could not save the palm');
     } finally {
       if (mounted) {
         setState(() {
