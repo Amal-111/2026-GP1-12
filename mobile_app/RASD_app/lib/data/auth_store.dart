@@ -1,3 +1,4 @@
+// In-memory store for the logged-in account, farm requests and invitations (legacy adapter used by older screens).
 import 'package:flutter/foundation.dart';
 
 import 'mock_data.dart';
@@ -23,6 +24,7 @@ class Account {
   });
 }
 
+/// Status of a farm request.
 enum RequestStatus { pending, approved, declined }
 
 /// A farmer asking to join a farm (Farm Assignment Request screen).
@@ -70,6 +72,7 @@ class AuthStore {
   static Account? _current;
   static String? _firebaseFarmId;
 
+  /// Stores the signed-in Firebase account locally.
   static void setFirebaseAccount(Account account, {String? farmId}) {
     _current = account;
     _firebaseFarmId = farmId;
@@ -122,6 +125,7 @@ class AuthStore {
 
   // ---------------- sign up / log in ----------------
 
+  /// True when the email is already used.
   static bool _emailTaken(String email, {String? exceptId}) {
     final e = email.trim().toLowerCase();
     return accounts.any(
@@ -186,6 +190,7 @@ class AuthStore {
     return 'No account found with this email.';
   }
 
+  /// Clears the local account data.
   static void logOut() {
     _current = null;
     _firebaseFarmId = null;
@@ -244,6 +249,7 @@ class AuthStore {
     return null;
   }
 
+  /// Creates a farm request.
   static void sendRequest(String farmId) {
     requests.add(FarmRequest(
       id: 'RQ${(requests.length + 1).toString().padLeft(3, '0')}',
@@ -254,6 +260,7 @@ class AuthStore {
     MockData.notifyChange();
   }
 
+  /// Cancels a farm request.
   static void cancelRequest(FarmRequest request) {
     requests.remove(request);
     MockData.notifyChange();
@@ -276,6 +283,7 @@ class AuthStore {
     MockData.notifyChange();
   }
 
+  /// Generates the next free id.
   static String _nextId(String prefix, Iterable<String> ids) {
     var max = 0;
     for (final id in ids) {
