@@ -1,10 +1,13 @@
+// Form to record that a palm was treated (date + notes) and mark it as treated.
 
 import 'package:flutter/material.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import '../services/rasd_errors.dart';
 
+/// Treatment record page.
 class TreatmentRecordPage extends StatefulWidget {
   final String palmId;
   final String farmId;
@@ -37,6 +40,7 @@ class _TreatmentRecordPageState
   final TextEditingController _notesController =
   TextEditingController();
 
+  /// True while saving (disables the button).
   bool _isSaving = false;
 
   Stream<DatabaseEvent> get _palmStream => FirebaseDatabase.instance
@@ -79,6 +83,7 @@ class _TreatmentRecordPageState
     super.dispose();
   }
 
+  /// Formats a date as day/month/year.
   String _formatDate(DateTime date) {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr',
@@ -90,6 +95,7 @@ class _TreatmentRecordPageState
         '${months[date.month - 1]} ${date.year}';
   }
 
+  /// Lets the user pick the treatment date.
   Future<void> _selectDate() async {
     final now = DateTime.now();
 
@@ -120,12 +126,14 @@ class _TreatmentRecordPageState
     }
   }
 
+  /// Saves the treatment record and marks the palm as treated.
   Future<void> _markAsTreated() async {
     if (_selectedMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a treatment method.'),
-        ),
+      showCenterMessage(
+        context,
+        'Choose how the palm was treated, then save.',
+        success: false,
+        title: 'Treatment method is missing',
       );
       return;
     }
@@ -150,7 +158,7 @@ class _TreatmentRecordPageState
 
       if (!mounted) return;
       if (result.data is Map && result.data['success'] != true) {
-        throw Exception('Treatment could not be saved.');
+        throw StateError('The treatment could not be saved. Please try again.');
       }
       setState(() {
         _selectedDate = DateTime.now();
@@ -164,20 +172,10 @@ class _TreatmentRecordPageState
           backgroundColor: AppColors.primary,
         ),
       );
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      final message = e.message ?? 'Unable to save treatment.';
-
-      debugPrint('Treatment Error Code: ${e.code}');
-      debugPrint('Treatment Error Message: ${e.message}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
     } catch (e) {
+      // RasdErrors turns Firebase and other errors into a clear message.
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to save treatment: $e')),
-      );
+      showRasdError(context, e, title: 'Could not save the treatment');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
