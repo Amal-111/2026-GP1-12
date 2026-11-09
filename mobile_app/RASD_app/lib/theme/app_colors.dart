@@ -1,5 +1,7 @@
+// Colour palette of the RASD app.
 import 'package:flutter/material.dart';
 
+/// All colours used in the app.
 class AppColors {
   static const primary = Color(0xFF245C43);
   static const secondary = Color(0xFF6B9875);
