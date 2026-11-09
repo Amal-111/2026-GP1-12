@@ -1,32 +1,37 @@
+// Log In screen: signs the user in with email + password and opens the right next screen.
 import 'package:flutter/material.dart';
-
+ 
 import '../services/firebase_auth_service.dart';
+import '../services/rasd_errors.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
 import 'auth_widgets.dart';
 import 'sign_up_page.dart';
-
+ 
+/// Log In page.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
-
+ 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
-
+ 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
+ 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
-
+ 
+  /// True while a request is running (disables the button).
   bool _busy = false;
+  /// Validates the form, logs in, then shows an error pop-up if it fails.
   Future<void> _logIn() async {
     if (_busy || !_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
@@ -35,12 +40,12 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       openAppAfterAuth(context);
     } catch (error) {
-      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+      if (mounted) showRasdError(context, error, title: 'Could not log in');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return PalmScaffold(
@@ -116,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                               controller: _passwordController,
                               isPassword: true,
                               validator: (v) => (v == null || v.isEmpty)
-                                  ? 'Please enter your password'
+                                  ? AuthValidators.requiredMessage
                                   : null,
                             ),
                           ],
@@ -127,7 +132,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ),
-
+ 
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Column(
@@ -180,3 +185,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+ 
