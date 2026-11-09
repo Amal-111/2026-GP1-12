@@ -1,6 +1,9 @@
+// Change Password screen with a live password-strength checklist.
 import 'package:flutter/material.dart';
 
 import '../auth/auth_widgets.dart';
+import '../auth/password_rules.dart';
+import '../services/rasd_errors.dart';
 import '../services/firebase_auth_service.dart';
 import '../theme/glass_widgets.dart';
 
@@ -26,7 +29,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
+  /// True while a request is running (disables the button).
   bool _busy = false;
+  /// Validates the form and changes the password.
   Future<void> _update() async {
     if (_busy || !_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
@@ -34,7 +39,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       await RasdAuthService.changePassword(_currentController.text, _newController.text);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+      if (mounted) {
+        showRasdError(
+          context,
+          error,
+          title: 'Could not change password',
+          credentialMessage: 'The current password is not correct.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -68,18 +80,28 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           controller: _currentController,
                           isPassword: true,
                           validator: (v) => (v == null || v.isEmpty)
-                              ? 'Please enter your current password'
+                              ? AuthValidators.requiredMessage
                               : null,
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
                           label: 'New Password',
-                          hint: 'At least 8 characters',
+                          hint: 'Create a strong password',
                           icon: Icons.lock_outline,
                           controller: _newController,
                           isPassword: true,
-                          validator: AuthValidators.password,
+                          validator: (v) {
+                            final rules = PasswordRules.validate(v);
+                            if (rules != null) return rules;
+                            if (v == _currentController.text) {
+                              return 'The new password must be different from the current one.';
+                            }
+                            return null;
+                          },
                         ),
+                        const SizedBox(height: 10),
+                        // Live checklist of the password rules.
+                        PasswordRulesBox(controller: _newController),
                         const SizedBox(height: 14),
                         AppTextField(
                           label: 'Confirm New Password',
@@ -88,7 +110,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           controller: _confirmController,
                           isPassword: true,
                           validator: (v) => v != _newController.text
-                              ? 'Passwords do not match'
+                              ? 'Passwords do not match. Type the same password again.'
                               : null,
                         ),
                       ],
@@ -101,9 +123,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _busy ? null : _update,
-                  child: const Text('Update Password'),
+                // The button stays grey until every password rule is met.
+                child: ListenableBuilder(
+                  listenable: _newController,
+                  builder: (context, _) => ElevatedButton(
+                    onPressed: (_busy || !PasswordRules.isStrong(_newController.text))
+                        ? null
+                        : _update,
+                    child: const Text('Update Password'),
+                  ),
                 ),
               ),
             ),
