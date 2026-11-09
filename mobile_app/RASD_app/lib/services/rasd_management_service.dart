@@ -1,3 +1,4 @@
+// Farm, palm, farmer and invitation operations (Cloud Functions + Realtime Database).
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -12,6 +13,7 @@ class RasdManagementService {
 
   static String get farmId => SelectedFarmService.farmId;
 
+  /// Calls a Cloud Function by name.
   static Future<void> _call(String name, Map<String, dynamic> data) async {
 
     debugPrint('Rasd Function: $name');
@@ -21,6 +23,7 @@ class RasdManagementService {
 
   }
 
+  /// Live stream of one farm.
   static Stream<RasdFarm?> watchFarm(String id) =>
       _db.ref('farms/$id').onValue.map((event) {
         if (!event.snapshot.exists) return null;
@@ -34,6 +37,7 @@ class RasdManagementService {
           palmCount: (data['totalPalms'] as num).toInt(), farmerCount: 0);
       });
 
+  /// Updates the farm details.
   static Future<void> updateFarm({required String name, required String description,
     required double latitude, required double longitude}) => _call('updateFarm', {
       'farmId': farmId,
@@ -41,6 +45,7 @@ class RasdManagementService {
         'latitude': latitude, 'longitude': longitude},
     });
 
+  /// Deletes the farm.
   static Future<void> deleteFarm() => _call('deleteFarm', {'farmId': farmId});
 
   static Stream<List<PalmData>> watchPalms() =>
@@ -72,18 +77,19 @@ class RasdManagementService {
   // Resolve the authenticated owner's real farm instead of the mock F001 ID.
   // When multiple farms exist, require the UI to select a real farm first.
 
+  /// Finds the farm a new palm should belong to.
   static Future<String> _farmIdForNewPalm() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
-      throw StateError('Please sign in before adding a palm.');
+      throw StateError('Your session has ended. Please log in again.');
     }
 
     // Read the real user role and farm assignment from Firebase.
     final userSnapshot = await _db.ref('users/$uid').get();
 
     if (!userSnapshot.exists || userSnapshot.value is! Map) {
-      throw StateError('User profile not found.');
+      throw StateError('We could not find your profile. Log out and log in again.');
     }
 
     final user = Map<String, dynamic>.from(
@@ -100,7 +106,7 @@ class RasdManagementService {
 
       if (assignedFarmId == null || assignedFarmId.isEmpty) {
         throw StateError(
-          'You are not assigned to a farm yet.',
+          'You are not assigned to a farm yet. Ask the farm owner to invite you.',
         );
       }
 
@@ -119,7 +125,7 @@ class RasdManagementService {
       if (!farmsSnapshot.exists ||
           farmsSnapshot.value is! Map) {
         throw StateError(
-          'No farms found for this account.',
+          'You have no farms yet. Add a farm first.',
         );
       }
 
@@ -135,12 +141,12 @@ class RasdManagementService {
         resolvedFarmId = farmIds.single;
       } else {
         throw StateError(
-          'Please select a farm before adding a palm.',
+          'Choose a farm first, then add the palm.',
         );
       }
     } else {
       throw StateError(
-        'Your account is not authorized to add palms.',
+        'Your account cannot add palms.',
       );
     }
 
@@ -151,7 +157,7 @@ class RasdManagementService {
 
     if (!farmSnapshot.exists ||
         farmSnapshot.value is! Map) {
-      throw StateError('Farm not found.');
+      throw StateError('This farm no longer exists.');
     }
 
     final farm = Map<String, dynamic>.from(
@@ -160,7 +166,7 @@ class RasdManagementService {
 
     if (farm['deleting'] == true) {
       throw StateError(
-        'This farm is currently being deleted.',
+        'This farm is being deleted. Try again later.',
       );
     }
 
@@ -168,6 +174,7 @@ class RasdManagementService {
   }
 
 
+  /// Adds a palm.
   static Future<void> addPalm({required int age, required String type,
     required double latitude, required double longitude, required String deviceId}) async {
     final realFarmId = await _farmIdForNewPalm();
@@ -179,6 +186,7 @@ class RasdManagementService {
     });
   }
 
+  /// Updates a palm.
   static Future<void> updatePalm(PalmData palm, {required int age,
     required String type}) => _call('updatePalm', {
       'farmId': farmId, 'palmId': palm.id,
@@ -188,6 +196,7 @@ class RasdManagementService {
     },
     });
 
+  /// Deletes a palm.
   static Future<void> deletePalm(PalmData palm) => _call('deletePalm', {
     'farmId': farmId, 'palmId': palm.id,
   });
@@ -207,10 +216,12 @@ class RasdManagementService {
         return result;
       });
 
+  /// Sends an invitation to a farmer.
   static Future<void> inviteFarmer(String email) => _call('sendInvitation', {
     'farmId': farmId, 'email': email.trim(),
   });
 
+  /// Removes a farmer from the farm.
   static Future<void> removeFarmer(String farmerId) => _call('removeFarmer', {
     'farmId': farmId, 'farmerId': farmerId,
   });
@@ -224,6 +235,7 @@ class RasdManagementService {
         }).toList();
       });
 
+  /// Cancels a pending invitation.
   static Future<void> cancelInvitation(String id) =>
       _call('cancelInvitation', {'invitationId': id});
 
@@ -238,13 +250,16 @@ class RasdManagementService {
     });
   }
 
+  /// Accepts an invitation.
   static Future<void> acceptInvitation(String id) =>
       _call('acceptInvitation', {'invitationId': id});
+  /// Declines an invitation.
   static Future<void> rejectInvitation(String id) =>
       _call('rejectInvitation', {'invitationId': id});
 
 
 
+  /// Looks up a farmer's email.
   static Future<String> getFarmerEmail(String farmerId) async {
     final snapshot = await _db.ref('users/$farmerId').get();
 
@@ -311,4 +326,3 @@ class RasdManagementService {
 
 
 }
-
