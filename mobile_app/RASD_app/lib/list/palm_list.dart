@@ -1,3 +1,4 @@
+// List of palms in the selected farm with status filtering.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -5,7 +6,10 @@ import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
 import '../manage_palms/add_palm_page.dart';
 import 'palm_details.dart';
+import '../services/rasd_errors.dart';
+import '../theme/glass_widgets.dart';
 
+/// Palm list page.
 class PalmListPage extends StatefulWidget {
   final String farmId;
   final String? initialStatus;
@@ -40,6 +44,7 @@ class _PalmListPageState extends State<PalmListPage> {
     );
   }
 
+  /// Re-subscribes when the widget receives new parameters.
   @override
   void didUpdateWidget(covariant PalmListPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -59,6 +64,7 @@ class _PalmListPageState extends State<PalmListPage> {
     super.dispose();
   }
 
+  /// Cleans up a raw status value from the database.
   String _normalizeStatus(Object? value) {
     final raw = (value ?? '').toString()
         .replaceAll('_', '')
@@ -78,6 +84,7 @@ class _PalmListPageState extends State<PalmListPage> {
     }
   }
 
+  /// Maps a palm status to its colour.
   Color _statusColor(String status) {
     switch (status) {
       case 'Healthy':
@@ -91,6 +98,7 @@ class _PalmListPageState extends State<PalmListPage> {
     }
   }
 
+  /// Maps a palm status to its icon.
   IconData _statusIcon(String status) {
     switch (status) {
       case 'Healthy':
@@ -130,6 +138,7 @@ class _PalmListPageState extends State<PalmListPage> {
     return result;
   }
 
+  /// Text for when the palm last sent data.
   String _lastUpdated(Map<String, dynamic> palm) {
     final raw = palm['updatedAt'] ??
         palm['lastSeen'] ??
@@ -159,6 +168,7 @@ class _PalmListPageState extends State<PalmListPage> {
         '${local.minute.toString().padLeft(2, '0')}';
   }
 
+  /// Opens the Add Palm flow and refreshes the list afterwards.
   Future<void> _addPalm() async {
     try {
       await Navigator.push<bool>(
@@ -173,12 +183,11 @@ class _PalmListPageState extends State<PalmListPage> {
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to add palm: $error')),
-      );
+      showRasdError(context, error, title: 'Could not add the palm');
     }
   }
 
+  /// Opens the details page of the tapped palm.
   void _openDetails(Map<String, dynamic> palm) {
     Navigator.push(
       context,
