@@ -1,3 +1,4 @@
+// Profile screen: account info, language, notifications and log out.
 import 'package:flutter/material.dart';
 import '../services/rasd_farms_service.dart';
 import '../auth/welcome_page.dart';
@@ -25,6 +26,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  /// Opens a page and shows a success message when it returns.
   Future<void> _open(Widget page, String successMessage) async {
     final done = await Navigator.push<bool>(
       context,
@@ -37,6 +39,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  /// Asks for confirmation, then logs out.
   Future<void> _confirmLogOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -262,6 +265,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
+/// Small label chip.
 class _Chip extends StatelessWidget {
   final String text;
   final bool filled;
@@ -291,6 +295,7 @@ class _Chip extends StatelessWidget {
   }
 }
 
+/// Label above a group of rows.
 class _SectionLabel extends StatelessWidget {
   final String text;
 
@@ -312,6 +317,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+/// Thin divider between rows.
 class _RowDivider extends StatelessWidget {
   const _RowDivider();
 
@@ -325,6 +331,7 @@ class _RowDivider extends StatelessWidget {
   }
 }
 
+/// Arrow icon at the end of a row.
 class _Chevron extends StatelessWidget {
   const _Chevron();
 
@@ -337,6 +344,7 @@ class _Chevron extends StatelessWidget {
   }
 }
 
+/// One tappable row in the menu.
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -383,6 +391,7 @@ class _MenuRow extends StatelessWidget {
   }
 }
 
+/// English / Arabic selector.
 class _LanguagePills extends StatelessWidget {
   const _LanguagePills();
 
