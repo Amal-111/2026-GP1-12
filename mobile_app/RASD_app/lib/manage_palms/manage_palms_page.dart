@@ -1,3 +1,4 @@
+// Lists the palms of a farm with search, edit and delete.
 import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
@@ -6,6 +7,7 @@ import '../services/rasd_management_service.dart';
 import 'add_palm_page.dart';
 import 'edit_palm_page.dart';
 import '../theme/glass_widgets.dart';
+import '../services/rasd_errors.dart';
 
 /// Manage Palms: list of palms with Add, Edit and Delete.
 class ManagePalmsPage extends StatefulWidget {
@@ -25,6 +27,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     super.dispose();
   }
 
+  /// Filters palms by the search text.
   List<Palm> _filteredPalms(List<Palm> allPalms) {
     final query = _searchController.text.trim().toLowerCase();
     return allPalms.where((palm) {
@@ -34,17 +37,20 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }).toList();
   }
 
+  /// Shows a short centred message.
   void _showMessage(String text) {
     showCenterMessage(context, text);
   }
 
+  /// Opens the Add Palm page.
   Future<void> _openAddPalm() async {
     // A farm owner who is not assigned to any farm cannot add palms.
     if (_store.activeFarmId == null || _store.activeFarmId!.isEmpty) {
       showCenterMessage(
         context,
-        'You are not assigned to any farm yet.',
+        'Ask the farm owner to invite you to a farm before adding palms.',
         success: false,
+        title: 'No farm assigned',
       );
       return;
     }
@@ -57,6 +63,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }
   }
 
+  /// Opens the Edit Palm page.
   Future<void> _openEditPalm(Palm palm) async {
     final saved = await Navigator.push<bool>(
       context,
@@ -67,6 +74,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }
   }
 
+  /// Asks for confirmation before removing the item.
   Future<void> _confirmDelete(Palm palm) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -95,11 +103,14 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
         await RasdManagementService.deletePalm(palm);
         if (mounted) _showMessage('Palm tree deleted successfully.');
       } catch (error) {
-        if (mounted) showCenterMessage(context, error.toString(), success: false);
+        if (mounted) {
+          showRasdError(context, error, title: 'Could not delete the palm');
+        }
       }
     }
   }
 
+  /// Maps a palm status to its colour.
   Color _statusColor(String status) {
     switch (status) {
       case 'Healthy':
@@ -115,6 +126,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }
   }
 
+  /// Maps a palm status to its icon.
   IconData _statusIcon(String status) {
     switch (status) {
       case 'Suspected':
@@ -193,6 +205,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     );
   }
 
+  /// Builds one palm row.
   Widget _buildPalmCard(Palm palm) {
     final color = _statusColor(palm.statusLabel);
 
