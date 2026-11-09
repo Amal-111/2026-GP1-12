@@ -1,3 +1,4 @@
+// Custom-painted palm icon used as a placeholder image.
 import 'package:flutter/material.dart';
 
 /// Palm tree icon (Flutter has no palm icon, Icons.park looks like a
@@ -41,6 +42,7 @@ Widget appIcon(IconData icon, {double? size, Color? color}) {
   return Icon(icon, size: size, color: color);
 }
 
+/// Draws the palm icon.
 class _PalmPainter extends CustomPainter {
   final Color color;
   _PalmPainter(this.color);
