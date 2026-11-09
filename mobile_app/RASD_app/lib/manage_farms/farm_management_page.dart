@@ -1,8 +1,10 @@
+// Farm management hub: shortcuts to palms, farmers, invitations and farm settings.
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../data/mock_data.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/farm_photo.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
 import '../manage_palms/manage_palms_page.dart';
@@ -10,6 +12,7 @@ import 'manage_farmers_page.dart';
 import 'farm_settings_page.dart';
 import 'invitations_page.dart';
 
+/// Farm management page.
 class FarmManagementPage extends StatelessWidget {
   final String farmId;
 
@@ -49,20 +52,13 @@ class FarmManagementPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: Image.asset(
-                      farm.imagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.beige,
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.agriculture_rounded,
-                            size: 52,
-                            color: AppColors.primary,
-                          ),
-                        );
-                      },
+                    // Shows the uploaded farm photo (or a palm placeholder).
+                    child: LayoutBuilder(
+                      builder: (context, box) => FarmImageView(
+                        path: farm.imagePath,
+                        width: box.maxWidth,
+                        height: box.maxHeight,
+                      ),
                     ),
                   ),
                 ),
@@ -240,6 +236,7 @@ class FarmManagementPage extends StatelessWidget {
   }
 }
 
+/// One shortcut card on the management page.
 class _ManagementCard extends StatelessWidget {
   final Widget icon;
   final String title;
