@@ -1,9 +1,11 @@
+// Farm creation and farm photo upload (Firebase Storage + Cloud Functions).
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 
+/// A farm record as read from the database.
 class FarmRecord {
   final String id;
   final String name;
@@ -31,13 +33,14 @@ class FarmRecord {
   }
 }
 
+/// Farm creation and photo upload.
 class RasdFarmsService {
   static final _database = FirebaseDatabase.instance;
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
   static Stream<List<FarmRecord>> watchMyFarms() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw StateError('Please sign in first.');
+    if (uid == null) throw StateError('Your session has ended. Please log in again.');
     return _database.ref('farms').orderByChild('ownerId').equalTo(uid).onValue.map((event) {
       final value = event.snapshot.value;
       if (value == null) return <FarmRecord>[];
@@ -47,6 +50,7 @@ class RasdFarmsService {
     });
   }
 
+  /// Creates a farm through the Cloud Function and returns its id.
   static Future<String> createFarm({required String name, required String description,
     required int totalPalms, required double latitude, required double longitude}) async {
     final result = await _functions.httpsCallable('createFarm').call(<String, dynamic>{
@@ -61,6 +65,7 @@ class RasdFarmsService {
   }
 
 
+  /// Uploads the farm photo to Firebase Storage and returns its URL.
   static Future<String> uploadFarmImage({
     required String farmId,
     required String imagePath,
@@ -68,23 +73,23 @@ class RasdFarmsService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
-      throw StateError('Please sign in first.');
+      throw StateError('Your session has ended. Please log in again.');
     }
 
     final file = File(imagePath);
 
     if (!await file.exists()) {
-      throw StateError('Selected image was not found.');
+      throw StateError('The photo could not be found. Choose it again.');
     }
 
     if (await file.length() >= 5 * 1024 * 1024) {
-      throw StateError('Farm image must be smaller than 5 MB.');
+      throw StateError('The photo must be smaller than 5 MB.');
     }
 
     final extension = imagePath.toLowerCase().split('.').last;
 
     if (!['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
-      throw StateError('Please select a JPG, PNG or WebP image.');
+      throw StateError('Choose a JPG, PNG or WebP photo.');
     }
 
     final contentType = extension == 'png'
@@ -105,6 +110,7 @@ class RasdFarmsService {
     return reference.getDownloadURL();
   }
 
+  /// Saves the photo URL on the farm (empty text removes the photo).
   static Future<void> updateFarmImage({
     required String farmId,
     required String imageUrl,
