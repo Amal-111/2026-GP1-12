@@ -1,3 +1,4 @@
+// App entry point: starts Firebase, applies the theme and decides which screen to show first (welcome, home, or farm assignment).
 import 'package:flutter/material.dart';
 import 'screens/home.dart';
 import 'theme/app_theme.dart';
@@ -47,6 +48,7 @@ Future<void> main() async {
   runApp(const RasdApp());
 }
 
+/// Root widget of the app.
 class RasdApp extends StatelessWidget {
   const RasdApp({super.key});
 
@@ -61,6 +63,7 @@ class RasdApp extends StatelessWidget {
   }
 }
 
+/// Decides the first screen based on the login state.
 class _AuthGate extends StatefulWidget {
   const _AuthGate();
   @override
@@ -70,6 +73,7 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   late final Future<int> _ready = _restore();
 
+  /// Restores the previous session (if any) and picks the start screen.
   Future<int> _restore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return 0;
