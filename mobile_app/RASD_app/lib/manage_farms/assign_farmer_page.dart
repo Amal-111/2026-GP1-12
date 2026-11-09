@@ -1,7 +1,11 @@
+// Lets the farm owner invite a farmer to the farm by email.
 import 'package:flutter/material.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
+import '../services/rasd_errors.dart';
+import '../auth/auth_widgets.dart';
 
+/// Invite Farmer page.
 class AssignFarmerPage extends StatefulWidget {
   const AssignFarmerPage({super.key});
   @override
@@ -11,6 +15,7 @@ class AssignFarmerPage extends StatefulWidget {
 class _AssignFarmerPageState extends State<AssignFarmerPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  /// True while saving (disables the button).
   bool _saving = false;
 
   @override
@@ -19,6 +24,7 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
     super.dispose();
   }
 
+  /// Sends an invitation to the farmer email entered by the owner.
   Future<void> _sendInvitation() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -26,7 +32,9 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
       await RasdManagementService.inviteFarmer(_emailController.text);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      if (mounted) {
+        showRasdError(context, error, title: 'Could not send the invitation');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -48,8 +56,7 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
                 TextFormField(controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(hintText: 'Enter registered farmer email'),
-                  validator: (value) => value == null || !value.contains('@')
-                    ? 'Please enter a valid email' : null),
+                  validator: AuthValidators.email),
                 const SizedBox(height: 12),
                 Text('The farmer must have a registered Farmer account and accept the invitation.',
                   style: Theme.of(context).textTheme.bodyMedium),
