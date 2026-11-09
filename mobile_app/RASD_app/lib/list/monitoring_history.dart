@@ -1,8 +1,10 @@
+// Monitoring history of a palm and the details page of a single monitoring record.
 import 'package:flutter/material.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+/// Shows the monitoring history of a palm.
 class MonitoringHistoryPage extends StatelessWidget {
   final String farmId;
   final String palmId;
@@ -48,6 +50,7 @@ class MonitoringHistoryPage extends StatelessWidget {
     return records;
   }
 
+  /// True when the monitoring result says a pest was detected.
   bool _isPestDetected(String result) {
     return result == 'Possible Pest Detected';
   }
@@ -222,6 +225,7 @@ class MonitoringHistoryPage extends StatelessWidget {
   }
 }
 
+/// Details of one monitoring record.
 class MonitoringRecordDetailsPage extends StatelessWidget {
   final String palmId;
   final String date;
@@ -337,6 +341,7 @@ class MonitoringRecordDetailsPage extends StatelessWidget {
   }
 }
 
+/// Row showing a label and a value.
 class _RecordInfoRow extends StatelessWidget {
   final IconData icon;
   final String title;
