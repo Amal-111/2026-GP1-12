@@ -1,8 +1,10 @@
+// Edit Profile screen: update the name and phone number.
 import 'package:flutter/material.dart';
 
 import '../auth/auth_widgets.dart';
 import '../data/auth_store.dart';
 import '../services/firebase_auth_service.dart';
+import '../services/rasd_errors.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 
@@ -36,11 +38,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
+  /// True while a request is running (disables the button).
   bool _busy = false;
+  /// Validates the form and saves the changes.
   Future<void> _save() async {
     if (_busy || !_formKey.currentState!.validate()) return;
     if (_emailController.text.trim() != AuthStore.email) {
-      showCenterMessage(context, 'Email changes require a separate verification flow.', success: false);
+      showCenterMessage(
+        context,
+        'Your email cannot be changed here. Contact support to change it.',
+        success: false,
+        title: 'Email not changed',
+      );
       return;
     }
     setState(() => _busy = true);
@@ -48,7 +57,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await RasdAuthService.updateProfile(name: _nameController.text, phone: _phoneController.text);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+      if (mounted) showRasdError(context, error, title: 'Could not save changes');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
