@@ -1,3 +1,4 @@
+// Farm map: shows every palm as a coloured pin by health status.
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
@@ -25,6 +26,7 @@ class FarmMapPage extends StatefulWidget {
 class _FarmMapPageState extends State<FarmMapPage> {
   final MapController _mapController = MapController();
   MapPalm? selectedPalm;
+  /// True for satellite view, false for map view.
   bool _satellite = true;
 
   final FirebaseDatabase _db = FirebaseDatabase.instance;
@@ -45,6 +47,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
     _watchFarm();
   }
 
+  /// Re-subscribes when the widget receives new parameters.
   @override
   void didUpdateWidget(covariant FarmMapPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -53,16 +56,19 @@ class _FarmMapPageState extends State<FarmMapPage> {
     }
   }
 
+  /// Safely converts a database value into a map.
   Map<String, dynamic> _asMap(Object? value) {
     if (value is! Map) return {};
     return Map<String, dynamic>.from(value);
   }
 
+  /// Safely reads a latitude/longitude value.
   double? _coordinate(Object? value) {
     final result = value is num ? value.toDouble() : double.tryParse('$value');
     return result?.isFinite == true ? result : null;
   }
 
+  /// Reads the palm status from the database value.
   String _status(Object? value) {
     switch ((value ?? '').toString().replaceAll('_', '').replaceAll(' ', '').toLowerCase()) {
       case 'healthy':
@@ -77,6 +83,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
     }
   }
 
+  /// Listens to farm and palm changes in Realtime Database.
   void _watchFarm() {
     _palmsSubscription?.cancel();
     _farmSubscription?.cancel();
@@ -167,6 +174,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
     });
   }
 
+  /// Recalculates palm statuses, e.g. when a device is offline.
   void _refreshPalmStatuses() {
     if (!mounted || _palms.isEmpty) return;
     setState(() {
@@ -193,6 +201,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
 
   List<MapPalm> get palms => _palms;
 
+  /// Maps a palm status to its pin colour.
   Color statusColor(String status) {
     switch (status) {
       case 'Healthy':
@@ -208,6 +217,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
     }
   }
 
+  /// Opens the details page of the tapped palm.
   void openPalmDetails(MapPalm palm) {
     Navigator.push(
       context,
