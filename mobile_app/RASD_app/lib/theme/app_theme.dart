@@ -1,7 +1,9 @@
+// Global Material theme (fonts, buttons, inputs).
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'glass_widgets.dart';
 
+/// Builds the app theme.
 class AppTheme {
   static ThemeData get lightTheme {
     final roundedBorder = OutlineInputBorder(
