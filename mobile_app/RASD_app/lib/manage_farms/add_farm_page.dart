@@ -1,14 +1,14 @@
-import 'dart:io';
-
+// Add Farm screen: farm details, location on the map and an optional farm photo.
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
+import '../services/rasd_errors.dart';
 import '../services/rasd_farms_service.dart';
+import '../widgets/farm_photo.dart';
 import '../manage_palms/farm_location_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
-import '../theme/palm_icon.dart';
 
+/// Add Farm page.
 class AddFarmPage extends StatefulWidget {
   const AddFarmPage({super.key});
 
@@ -23,8 +23,10 @@ class _AddFarmPageState extends State<AddFarmPage> {
   final _descriptionController = TextEditingController();
   final _palmCountController = TextEditingController();
 
+  /// True while saving (disables the button).
   bool _saving = false;
 
+  /// Path of the photo chosen on this device.
   String _imagePath = '';
   double? _latitude;
   double? _longitude;
@@ -37,20 +39,14 @@ class _AddFarmPageState extends State<AddFarmPage> {
     super.dispose();
   }
 
+  /// Opens the Camera / Gallery choice and keeps the chosen photo path.
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-
-    final image = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
-
-    if (image == null) return;
-
-    setState(() {
-      _imagePath = image.path;
-    });
+    final path = await FarmPhotoPicker.choose(context);
+    if (path == null) return;
+    setState(() => _imagePath = path);
   }
 
+  /// Opens the map so the user can choose a location.
   Future<void> _openLocationPicker() async {
     final result =
     await Navigator.push<({double latitude, double longitude})>(
@@ -71,10 +67,16 @@ class _AddFarmPageState extends State<AddFarmPage> {
     });
   }
 
+  /// Validates the form, creates the farm and uploads the photo if one was chosen.
   Future<void> _addFarm() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     if (_latitude == null || _longitude == null) {
-      showCenterMessage(context, 'Please select the farm location.', success: false);
+      showCenterMessage(
+        context,
+        'Tap the location box and choose where the farm is on the map.',
+        success: false,
+        title: 'Farm location is missing',
+      );
       return;
     }
     setState(() => _saving = true);
@@ -100,16 +102,17 @@ class _AddFarmPageState extends State<AddFarmPage> {
             imageUrl: imageUrl,
           );
         } catch (error) {
+          // The farm exists already; only the photo failed.
           debugPrint('Farm image upload failed: $error');
 
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Farm created, but the image could not be saved.',
-              ),
-            ),
+          await showCenterMessage(
+            context,
+            'The farm was added, but the photo could not be saved. '
+            'Add it again from Farm Settings.',
+            success: false,
+            title: 'Farm added',
           );
         }
       }
@@ -118,47 +121,10 @@ class _AddFarmPageState extends State<AddFarmPage> {
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not add farm: $error')),
-      );
+      showRasdError(context, error, title: 'Could not add farm');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  Widget _buildFarmImage() {
-    if (_imagePath.isEmpty) {
-      return Container(
-        width: double.infinity,
-        height: 170,
-        color: AppColors.beige,
-        alignment: Alignment.center,
-        child: const PalmIcon(
-          size: 52,
-          color: AppColors.primary,
-        ),
-      );
-    }
-
-    return Image.file(
-      File(_imagePath),
-      width: double.infinity,
-      height: 170,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) {
-        return Container(
-          width: double.infinity,
-          height: 170,
-          color: AppColors.beige,
-          alignment: Alignment.center,
-          child: const Icon(
-            Icons.agriculture_rounded,
-            size: 52,
-            color: AppColors.primary,
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -179,33 +145,13 @@ class _AddFarmPageState extends State<AddFarmPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _FieldLabel('Farm Image'),
+                        const _FieldLabel('Farm Photo (optional)'),
 
-                        Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: _buildFarmImage(),
-                            ),
-
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Material(
-                                color: Colors.white.withValues(
-                                  alpha: 0.88,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                child: IconButton(
-                                  onPressed: _pickImage,
-                                  icon: const Icon(
-                                    Icons.camera_alt_outlined,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        // Add / change / remove the farm photo.
+                        FarmPhotoBox(
+                          imagePath: _imagePath,
+                          onChange: _pickImage,
+                          onRemove: () => setState(() => _imagePath = ''),
                         ),
 
                         const SizedBox(height: 18),
@@ -219,7 +165,7 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           validator: (value) {
                             if (value == null ||
                                 value.trim().isEmpty) {
-                              return 'Please enter the farm name';
+                              return 'This field is required.';
                             }
 
                             return null;
@@ -257,12 +203,16 @@ class _AddFarmPageState extends State<AddFarmPage> {
                               value?.trim() ?? '',
                             );
 
+                            if ((value ?? '').trim().isEmpty) {
+                              return 'This field is required.';
+                            }
+
                             if (count == null) {
-                              return 'Please enter the number of palms';
+                              return 'Enter the number of palms as a whole number.';
                             }
 
                             if (count < 0) {
-                              return 'Number of palms cannot be negative';
+                              return 'Enter a number of palms that is 0 or more.';
                             }
 
                             return null;
@@ -349,6 +299,7 @@ class _AddFarmPageState extends State<AddFarmPage> {
   }
 }
 
+/// Full-screen map for choosing the farm location.
 class _FarmLocationPage extends StatefulWidget {
   final double? latitude;
   final double? longitude;
@@ -428,6 +379,7 @@ class _FarmLocationPageState extends State<_FarmLocationPage> {
   }
 }
 
+/// Small label shown above a form field.
 class _FieldLabel extends StatelessWidget {
   final String text;
 
