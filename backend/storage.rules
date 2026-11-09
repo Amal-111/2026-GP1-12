@@ -1,11 +1,15 @@
-
 rules_version = '2';
-/*
+// Firebase Storage rules for RASD farm photos.
+// (The stray "/*" that used to be on line 2 turned the whole file into a comment
+//  and is the reason photo uploads were failing.)
 service firebase.storage {
   match /b/{bucket}/o {
+    // Farm photos live at farmImages/{ownerUid}/{farmId}.{ext}
     match /farmImages/{ownerId}/{fileName} {
+      // Any signed-in user can view a farm photo.
       allow read: if request.auth != null;
 
+      // Only the farm owner can upload; max 5 MB and must be an image.
       allow write: if request.auth != null
         && request.auth.uid == ownerId
         && request.resource != null
