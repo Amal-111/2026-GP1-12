@@ -1,17 +1,19 @@
+// Shared widgets and input validators used by the Sign Up, Log In and profile screens.
 import 'package:flutter/material.dart';
-
+ 
 import '../data/auth_store.dart';
 import '../data/mock_data.dart';
 import '../manage_farms/my_farms_page.dart';
 import '../screens/home.dart';
 import '../theme/app_colors.dart';
-
+import 'password_rules.dart';
+ 
 /// Small label above a field (same look as the other forms).
 class FieldLabel extends StatelessWidget {
   final String text;
-
+ 
   const FieldLabel(this.text, {super.key});
-
+ 
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -20,7 +22,7 @@ class FieldLabel extends StatelessWidget {
     );
   }
 }
-
+ 
 /// Label + text field with an icon. The input style comes from the theme.
 /// With [isPassword] it hides the text and shows an eye button.
 class AppTextField extends StatefulWidget {
@@ -31,7 +33,7 @@ class AppTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final bool isPassword;
   final String? Function(String?)? validator;
-
+ 
   const AppTextField({
     super.key,
     required this.label,
@@ -42,14 +44,15 @@ class AppTextField extends StatefulWidget {
     this.isPassword = false,
     this.validator,
   });
-
+ 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
 }
-
+ 
+/// State of the text field (handles show/hide password).
 class _AppTextFieldState extends State<AppTextField> {
   bool _hidden = true;
-
+ 
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -81,40 +84,54 @@ class _AppTextFieldState extends State<AppTextField> {
     );
   }
 }
-
-/// Field checks shared by Sign Up, Log In, Edit Profile, Change Password.
+ 
+/// Field checks shared by Sign Up, Log In, Edit Profile and Change Password.
+/// Each check returns the red message shown under the field, or null when the
+/// value is fine. The wording is the same on every screen.
 class AuthValidators {
-  static String? name(String? v) =>
-      (v == null || v.trim().isEmpty) ? 'Please enter your full name' : null;
-
+  AuthValidators._();
+ 
+  static const String requiredMessage = 'This field is required.';
+ 
+  /// Any field that must not be empty.
+  static String? required(String? v) =>
+      (v == null || v.trim().isEmpty) ? requiredMessage : null;
+ 
+  /// Full name: letters (English or Arabic), spaces, dots, apostrophes and dashes.
+  static String? name(String? v) {
+    final value = v?.trim() ?? '';
+    if (value.isEmpty) return requiredMessage;
+    final ok = value.length >= 2 &&
+        RegExp(r"^[\p{L}\s.'-]+$", unicode: true).hasMatch(value);
+    return ok ? null : 'Enter your full name, using letters only.';
+  }
+ 
+  /// Email: must look like name@example.com.
   static String? email(String? v) {
     final value = v?.trim() ?? '';
-    if (value.isEmpty) return 'Please enter your email';
+    if (value.isEmpty) return requiredMessage;
     final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
-    return ok ? null : 'Please enter a valid email';
+    return ok ? null : 'Enter a valid email, like name@example.com.';
   }
-
-  /// Phone is optional, but when it is written it must look like 05XXXXXXXX.
+ 
+  /// Phone: Saudi mobile number, 05 followed by 8 digits (10 digits in total).
   static String? phone(String? v) {
     final value = v?.trim() ?? '';
-    if (value.isEmpty) return null;
+    if (value.isEmpty) return requiredMessage;
     return RegExp(r'^05\d{8}$').hasMatch(value)
         ? null
-        : 'Use the format 05XXXXXXXX';
+        : 'Enter a phone number that starts with 05 and has 10 digits.';
   }
-
-  static String? password(String? v) {
-    if (v == null || v.isEmpty) return 'Please enter a password';
-    if (v.length < 8) return 'Use at least 8 characters';
-    return null;
-  }
+ 
+  /// New password: must follow every password rule (see [PasswordRules]).
+  static String? password(String? v) => PasswordRules.validate(v);
 }
-
+ 
 /// English / العربية switch. Only changes AuthStore.arabic for now; the app
 /// texts are not translated yet.
 class LanguageToggle extends StatelessWidget {
   const LanguageToggle({super.key});
-
+ 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -131,7 +148,8 @@ class LanguageToggle extends StatelessWidget {
       },
     );
   }
-
+ 
+  /// Builds a selectable pill button.
   Widget _pill(String text, bool selected, VoidCallback onTap) {
     return Material(
       color: selected ? AppColors.primary : Colors.white.withValues(alpha: 0.6),
@@ -155,7 +173,7 @@ class LanguageToggle extends StatelessWidget {
     );
   }
 }
-
+ 
 /// After Sign Up or Log In: a farm owner goes to My Farms, a farmer goes to
 /// Home (Home shows the "No Farm Assigned" page when the farmer has no farm).
 void openAppAfterAuth(BuildContext context) {
@@ -168,3 +186,4 @@ void openAppAfterAuth(BuildContext context) {
     (route) => false,
   );
 }
+ 
