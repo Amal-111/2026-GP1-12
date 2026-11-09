@@ -1,3 +1,4 @@
+// Details of a single alert.
 import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import '../theme/glass_widgets.dart';
@@ -8,6 +9,7 @@ import 'alerts.dart';
 import '../list/palm_details.dart';
 import '../map/palm_map.dart';
 
+/// Alert details page.
 class AlertDetailsScreen extends StatefulWidget {
   final RasdAlert alert;
 
