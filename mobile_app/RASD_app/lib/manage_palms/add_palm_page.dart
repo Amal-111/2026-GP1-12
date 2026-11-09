@@ -1,3 +1,4 @@
+// Add Palm screen (two steps: palm information, then location).
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
@@ -27,6 +28,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
   final _lngController = TextEditingController();
 
   String? _type;
+  /// Current step of the form.
   int _step = 0; // 0 = information, 1 = location
 
   @override
@@ -37,6 +39,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
     super.dispose();
   }
 
+  /// Fills the location with the device's current position.
   void _useCurrentLocation() {
     // TODO: get the real GPS location with the "geolocator" package.
     // For now it fills a sample location in the farm.
@@ -46,6 +49,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
     });
   }
 
+  /// Validates the current step and moves forward (or saves on the last step).
   Future<void> _next() async {
     if (_step == 0) {
       if (_infoFormKey.currentState!.validate()) {
@@ -71,6 +75,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
     if (added == true && mounted) Navigator.pop(context, true);
   }
 
+  /// Goes back one step.
   void _back() {
     if (_step == 1) {
       setState(() => _step = 0);
@@ -131,6 +136,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
     );
   }
 
+  /// Step 1: palm information fields.
   Widget _buildInfoStep() {
     return Form(
       key: _infoFormKey,
@@ -172,6 +178,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
     );
   }
 
+  /// Step 2: choose the palm location.
   Widget _buildLocationStep() {
     return Form(
       key: _locationFormKey,
@@ -305,6 +312,7 @@ class PalmStepHeader extends StatelessWidget {
   }
 }
 
+/// Small label shown above a form field.
 class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel(this.text);
