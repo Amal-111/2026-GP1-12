@@ -1,3 +1,4 @@
+// Guidance page: signs of red palm weevil infestation and what to do.
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -141,6 +142,7 @@ class GuidancePage extends StatelessWidget {
   }
 }
 
+/// Section heading.
 class _Heading extends StatelessWidget {
   final String text;
 
@@ -158,6 +160,7 @@ class _Heading extends StatelessWidget {
   }
 }
 
+/// Bulleted text line.
 class _Bullet extends StatelessWidget {
   final String text;
 
@@ -189,6 +192,7 @@ class _Bullet extends StatelessWidget {
   }
 }
 
+/// Row describing a palm status.
 class _StatusRow extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -248,6 +252,7 @@ class _StatusRow extends StatelessWidget {
   }
 }
 
+/// One numbered step.
 class _Step extends StatelessWidget {
   final int number;
   final String text;
