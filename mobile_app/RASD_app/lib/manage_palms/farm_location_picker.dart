@@ -1,3 +1,4 @@
+// Map widget for choosing a location by tapping (satellite / map view).
 import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -35,7 +36,9 @@ class FarmLocationPicker extends StatefulWidget {
 
 class _FarmLocationPickerState extends State<FarmLocationPicker> {
   final MapController _mapController = MapController();
+  /// True once the map has loaded.
   bool _mapReady = false;
+  /// True for satellite view, false for map view.
   bool _satellite = true;
 
   LatLng? get _pin {
@@ -46,6 +49,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
     return LatLng(lat, lng);
   }
 
+  /// Re-subscribes when the widget receives new parameters.
   @override
   void didUpdateWidget(covariant FarmLocationPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -62,6 +66,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
     });
   }
 
+  /// Moves the pin to the tapped map position.
   void _onTap(LatLng point) {
     widget.onPicked((
       latitude: double.parse(point.latitude.toStringAsFixed(6)),
@@ -210,6 +215,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
   }
 }
 
+/// Round button on the map.
 class _MapButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
@@ -227,6 +233,7 @@ class _MapButton extends StatelessWidget {
   }
 }
 
+/// Map pin drawing.
 class _Pin extends StatelessWidget {
   final IconData icon;
   const _Pin({required this.icon});
