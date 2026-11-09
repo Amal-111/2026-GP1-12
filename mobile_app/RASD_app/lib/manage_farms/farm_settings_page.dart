@@ -1,14 +1,16 @@
-import 'dart:io';
-
+// Farm settings: edit farm details, location and photo, or delete the farm.
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../data/mock_data.dart';
+import '../services/rasd_errors.dart';
+import '../services/rasd_farms_service.dart';
 import '../services/rasd_management_service.dart';
+import '../widgets/farm_photo.dart';
 import '../manage_palms/farm_location_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 
+/// Farm settings page.
 class FarmSettingsPage extends StatefulWidget {
   const FarmSettingsPage({super.key});
 
@@ -20,7 +22,14 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
 
+  /// Photo shown on screen: a saved web address or a file just picked.
   late String _imagePath;
+
+  /// The photo that was saved when the page opened (to know if it changed).
+  late String _savedImagePath;
+
+  /// True while saving (disables the button).
+  bool _saving = false;
 
   double? _latitude;
   double? _longitude;
@@ -40,6 +49,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     );
 
     _imagePath = farm.imagePath;
+    _savedImagePath = farm.imagePath;
     _latitude = farm.latitude;
     _longitude = farm.longitude;
   }
@@ -51,20 +61,15 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     super.dispose();
   }
 
+  /// Opens the Camera / Gallery choice and shows the chosen photo.
+  /// The photo is only uploaded when the user taps Save.
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-
-    final image = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
-
-    if (image == null) return;
-
-    setState(() {
-      _imagePath = image.path;
-    });
+    final path = await FarmPhotoPicker.choose(context);
+    if (path == null) return;
+    setState(() => _imagePath = path);
   }
 
+  /// Opens the map so the user can choose a location.
   Future<void> _openLocationPicker() async {
     final result =
     await Navigator.push<({double latitude, double longitude})>(
@@ -85,23 +90,76 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     });
   }
 
+  /// Saves the farm details, then uploads the photo if it was changed or removed.
   Future<void> _saveChanges() async {
+    if (_saving) return;
+
     final name = _nameController.text.trim();
-    if (name.isEmpty || _latitude == null || _longitude == null) {
-      showCenterMessage(context, 'Please enter a farm name and location.', success: false);
+    if (name.isEmpty) {
+      showCenterMessage(
+        context,
+        'Enter the farm name before saving.',
+        success: false,
+        title: 'Farm name is missing',
+      );
       return;
     }
+    if (_latitude == null || _longitude == null) {
+      showCenterMessage(
+        context,
+        'Tap the location box and choose where the farm is on the map.',
+        success: false,
+        title: 'Farm location is missing',
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
     try {
-      await RasdManagementService.updateFarm(name: name,
+      // 1. Save name, description and location.
+      await RasdManagementService.updateFarm(
+        name: name,
         description: _descriptionController.text.trim(),
-        latitude: _latitude!, longitude: _longitude!);
+        latitude: _latitude!,
+        longitude: _longitude!,
+      );
+
+      // 2. Photo: upload a new one, or clear it when it was removed.
+      final photoChanged = _imagePath != _savedImagePath;
+      if (photoChanged) {
+        try {
+          final farmId = RasdManagementService.farmId;
+          final imageUrl = _imagePath.isEmpty
+              ? ''
+              : await RasdFarmsService.uploadFarmImage(
+                  farmId: farmId,
+                  imagePath: _imagePath,
+                );
+          await RasdFarmsService.updateFarmImage(
+            farmId: farmId,
+            imageUrl: imageUrl,
+          );
+          _savedImagePath = _imagePath;
+        } catch (error) {
+          // The details were saved; only the photo failed.
+          if (!mounted) return;
+          await showRasdError(context, error, title: 'Photo not saved');
+          return;
+        }
+      }
+
       if (!mounted) return;
       showCenterMessage(context, 'Farm information updated successfully.');
     } catch (error) {
-      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      if (mounted) {
+        showRasdError(context, error, title: 'Could not save the farm');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
+  /// Asks for confirmation, then deletes the farm.
   Future<void> _confirmDeleteFarm() async {
     final farm = MockData.selectedFarm;
 
@@ -136,7 +194,9 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     try {
       await RasdManagementService.deleteFarm();
     } catch (error) {
-      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      if (mounted) {
+        showRasdError(context, error, title: 'Could not delete the farm');
+      }
       return;
     }
     if (!mounted) return;
@@ -144,46 +204,6 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     Navigator.popUntil(
       context,
           (route) => route.isFirst,
-    );
-  }
-
-  Widget _buildFarmImage() {
-    final isAsset = _imagePath.startsWith('assets/');
-
-    if (isAsset) {
-      return Image.asset(
-        _imagePath,
-        width: double.infinity,
-        height: 180,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return _imageFallback();
-        },
-      );
-    }
-
-    return Image.file(
-      File(_imagePath),
-      width: double.infinity,
-      height: 180,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) {
-        return _imageFallback();
-      },
-    );
-  }
-
-  Widget _imageFallback() {
-    return Container(
-      width: double.infinity,
-      height: 180,
-      color: AppColors.beige,
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.image_outlined,
-        size: 48,
-        color: AppColors.primary,
-      ),
     );
   }
 
@@ -209,36 +229,13 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
                     crossAxisAlignment:
                     CrossAxisAlignment.start,
                     children: [
-                      const _FieldLabel('Farm Image'),
+                      const _FieldLabel('Farm Photo'),
 
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          ClipRRect(
-                            borderRadius:
-                            BorderRadius.circular(16),
-                            child: _buildFarmImage(),
-                          ),
-
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Material(
-                              color: Colors.white.withValues(
-                                alpha: 0.88,
-                              ),
-                              borderRadius:
-                              BorderRadius.circular(12),
-                              child: IconButton(
-                                onPressed: _pickImage,
-                                icon: const Icon(
-                                  Icons.camera_alt_outlined,
-                                  color: AppColors.primary,
-                                ),
-                                tooltip: 'Change farm image',
-                              ),
-                            ),
-                          ),
-                        ],
+                      // Add / change / remove the farm photo.
+                      FarmPhotoBox(
+                        imagePath: _imagePath,
+                        onChange: _pickImage,
+                        onRemove: () => setState(() => _imagePath = ''),
                       ),
 
                       const SizedBox(height: 18),
@@ -362,9 +359,9 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saveChanges,
-                  child: const Text(
-                    'Save Changes',
+                  onPressed: _saving ? null : _saveChanges,
+                  child: Text(
+                    _saving ? 'Saving...' : 'Save Changes',
                   ),
                 ),
               ),
@@ -404,6 +401,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
   }
 }
 
+/// Full-screen map for choosing the farm location.
 class _FarmLocationPage extends StatefulWidget {
   final double? latitude;
   final double? longitude;
@@ -496,6 +494,7 @@ class _FarmLocationPageState
   }
 }
 
+/// Small label shown above a form field.
 class _FieldLabel extends StatelessWidget {
   final String text;
 
