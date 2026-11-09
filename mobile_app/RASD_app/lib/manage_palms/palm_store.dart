@@ -1,3 +1,4 @@
+// Palm helpers: input validators and a small in-memory palm store.
 import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
 
@@ -14,6 +15,7 @@ extension PalmInfo on PalmData {
   /// 'Healthy', 'Suspected' or 'Under Monitoring'.
   String get statusLabel => palmStatusLabel(status);
 
+  /// Reads one part of a coordinate text.
   static double _part(String text, int index) {
     final parts = text.split(',');
     if (parts.length != 2) return 0;
@@ -21,6 +23,7 @@ extension PalmInfo on PalmData {
   }
 }
 
+/// Small in-memory palm store.
 class PalmStore {
   PalmStore._();
   static final PalmStore instance = PalmStore._();
@@ -54,6 +57,7 @@ class PalmStore {
     'Under Monitoring',
   ];
 
+  /// Converts a status label to a PalmStatus.
   static PalmStatus statusFromLabel(String label) => switch (label) {
         'Suspected' => PalmStatus.suspected,
         'Under Monitoring' => PalmStatus.underMonitoring,
@@ -63,10 +67,12 @@ class PalmStore {
   /// Next palm ID given by the system (P008, P009...).
   String nextPalmId() => MockData.nextPalmId();
 
+  /// True when a palm with this id already exists.
   bool idExists(String id, {PalmData? except}) {
     return MockData.palms.any((p) => p.id == id.trim() && p != except);
   }
 
+  /// True when the text contains only digits.
   static bool isDigits(String value) => RegExp(r'^\d+$').hasMatch(value.trim());
 
   static String _pad(String number) =>
@@ -97,6 +103,7 @@ class PalmStore {
     return null;
   }
 
+  /// Adds a palm to the store.
   void addPalm({
     required String id,
     required int age,
@@ -127,6 +134,7 @@ class PalmStore {
     ));
   }
 
+  /// Updates a palm in the store.
   void updatePalm(
     PalmData palm, {
     required String id,
@@ -151,6 +159,7 @@ class PalmStore {
 
 /// Shared form checks, so every page shows the same messages.
 class PalmValidators {
+  /// Checks the field is not empty.
   static String? required(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'This field is required.';
@@ -162,40 +171,43 @@ class PalmValidators {
   static String? palmId(String? value) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'This field is required.';
-    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Palm ID must be a number.';
+    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Enter the palm ID as numbers only.';
     if (!RegExp(r'^\d{3}$').hasMatch(v) || v == '000') {
-      return 'Palm ID must be 3 digits (e.g. 008).';
+      return 'Enter the palm ID as 3 digits, like 008.';
     }
     return null;
   }
 
+  /// Checks the age is a valid number.
   static String? age(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'This field is required.';
     }
     if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
-      return 'Age must be a number.';
+      return 'Enter the age as a whole number.';
     }
     return null;
   }
 
+  /// Checks the latitude range.
   static String? latitude(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'This field is required.';
     }
     final n = double.tryParse(value.trim());
-    if (n == null) return 'Latitude must be a number.';
-    if (n < -90 || n > 90) return 'Latitude must be between -90 and 90.';
+    if (n == null) return 'Enter the latitude as a number, like 24.7136.';
+    if (n < -90 || n > 90) return 'Enter a latitude between -90 and 90.';
     return null;
   }
 
+  /// Checks the longitude range.
   static String? longitude(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'This field is required.';
     }
     final n = double.tryParse(value.trim());
-    if (n == null) return 'Longitude must be a number.';
-    if (n < -180 || n > 180) return 'Longitude must be between -180 and 180.';
+    if (n == null) return 'Enter the longitude as a number, like 46.6753.';
+    if (n < -180 || n > 180) return 'Enter a longitude between -180 and 180.';
     return null;
   }
 }
