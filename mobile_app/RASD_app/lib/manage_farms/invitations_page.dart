@@ -1,7 +1,10 @@
+// Lists the invitations the owner has sent and their status.
 import 'package:flutter/material.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
+import '../services/rasd_errors.dart';
 
+/// Page listing sent invitations.
 class InvitationsPage extends StatelessWidget {
   const InvitationsPage({super.key});
 
@@ -52,7 +55,9 @@ class InvitationsPage extends StatelessWidget {
                   try {
                     await RasdManagementService.cancelInvitation(invitation['id'].toString());
                   } catch (error) {
-                    if (context.mounted) showCenterMessage(context, error.toString(), success: false);
+                    if (context.mounted) {
+                      showRasdError(context, error, title: 'Could not cancel the invitation');
+                    }
                   }
                 }, child: const Text('Cancel')),
               ]));
