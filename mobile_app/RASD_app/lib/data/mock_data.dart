@@ -1,9 +1,14 @@
+// Data models (palms, farms, farmers, alerts) and in-memory sample data shared by older screens.
 import 'package:flutter/foundation.dart';
 
+/// Health status of a palm.
 enum PalmStatus { healthy, suspected, underMonitoring }
+/// Kinds of alerts.
 enum AlertType { suspected, monitoring, deviceOffline }
+/// The two kinds of users.
 enum UserRole { farmer, farmOwner }
 
+/// A signed-in user.
 class RasdUser {
   final String name;
   final UserRole role;
@@ -11,6 +16,7 @@ class RasdUser {
   const RasdUser(this.name, this.role, {this.farmId});
 }
 
+/// A farmer.
 class FarmerData {
   final String id;
   String name;
@@ -27,6 +33,7 @@ class FarmerData {
   });
 }
 
+/// A farm.
 class RasdFarm {
   final String id;
   String name;
@@ -51,6 +58,7 @@ class RasdFarm {
       });
 }
 
+/// A palm.
 class PalmData {
   // id and name can change from the Edit Palm page.
   String id;
@@ -78,6 +86,7 @@ class PalmData {
       : sensorLocation = sensorLocation ?? location;
 }
 
+/// An alert.
 class AlertData {
   final String id;
   final String farmId;
@@ -93,6 +102,7 @@ class AlertData {
     this.isRead = false, this.isCurrent = true});
 }
 
+/// A treatment record.
 class TreatmentEntry {
   String palmId; // changes if the palm ID is edited
   final DateTime date;
@@ -103,16 +113,20 @@ class TreatmentEntry {
     required this.notes, required this.createdAt});
 }
 
+/// Sample data and helpers.
 class MockData {
   static final List<TreatmentEntry> treatments = [];
+  /// Treatments recorded for a palm.
   static List<TreatmentEntry> treatmentsForPalm(String palmId) =>
       treatments.where((entry) => entry.palmId == palmId).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+  /// Monitoring events of a palm.
   static List<AlertData> monitoringEventsForPalm(String palmId) =>
       alerts.where((alert) => alert.palmId == palmId).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+  /// Saves a treatment record for a palm.
   static void saveTreatment({required PalmData palm, required DateTime date,
     required String method, required String notes}) {
     treatments.add(TreatmentEntry(palmId: palm.id, date: date,
@@ -122,10 +136,14 @@ class MockData {
   }
 
   static final ValueNotifier<int> changes = ValueNotifier<int>(0);
+  /// Tells listeners that the data changed.
   static void notifyChange() => changes.value++;
 
+  /// Sample farmer account.
   static const farmer = RasdUser('Ahmed', UserRole.farmer, farmId: 'F001');
+  /// Sample owner account.
   static const owner = RasdUser('Sara', UserRole.farmOwner);
+  /// The user currently using the app.
   static RasdUser currentUser = farmer; // owner;
   static final List<FarmerData> farmers = [
     FarmerData(
@@ -158,16 +176,19 @@ class MockData {
     ),
   ];
 
+  /// Farmers of a farm.
   static List<FarmerData> farmersForFarm([String? farmId]) =>
       farmers
           .where((farmer) => farmer.farmId == (farmId ?? selectedFarmId))
           .toList();
 
+  /// Removes a farmer.
   static void deleteFarmer(FarmerData farmer) {
     farmers.remove(farmer);
     notifyChange();
   }
 
+  /// Updates a farmer.
   static void updateFarmer(
       FarmerData farmer, {
         required String name,
@@ -181,11 +202,13 @@ class MockData {
 
     notifyChange();
   }
+  /// Assigns a farmer to a farm.
   static void assignFarmerToFarm(FarmerData farmer, String farmId) {
     farmer.farmId = farmId;
     notifyChange();
   }
 
+  /// Updates a farm.
   static void updateFarm(
       RasdFarm farm, {
         required String name,
@@ -206,6 +229,7 @@ class MockData {
     notifyChange();
   }
 
+  /// Deletes a farm.
   static void deleteFarm(RasdFarm farm) {
     farms.remove(farm);
 
@@ -240,6 +264,7 @@ class MockData {
       farmerCount: 1,
     ),
   ];
+  /// Id of the farm currently selected.
   static String selectedFarmId = 'F001';
 
   static RasdFarm get selectedFarm =>
@@ -252,6 +277,7 @@ class MockData {
           ? a
           : b);
 
+  /// Generates the next farm id.
   static String nextFarmId() {
     int maxNumber = 0;
 
@@ -267,6 +293,7 @@ class MockData {
     return 'F${(maxNumber + 1).toString().padLeft(3, '0')}';
   }
 
+  /// Adds a farm.
   static void addFarm(RasdFarm farm) {
     farms.add(farm);
     notifyChange();
@@ -425,6 +452,7 @@ class MockData {
     return 'P${(maxNumber + 1).toString().padLeft(3, '0')}';
   }
 
+  /// Adds a palm.
   static void addPalm(PalmData palm) {
     palms.add(palm);
     notifyChange();
@@ -461,9 +489,11 @@ class MockData {
     notifyChange();
   }
 
+  /// Palms of a farm.
   static List<PalmData> palmsForFarm([String? farmId]) =>
       palms.where((p) => p.farmId == (farmId ?? selectedFarmId)).toList();
 
+  /// Finds a palm by id.
   static PalmData? palmById(String id) {
     for (final p in palms) {
       if (p.id == id) return p;
@@ -471,14 +501,17 @@ class MockData {
     return null;
   }
 
+  /// Counts palms with a status.
   static int count(PalmStatus status) =>
       palmsForFarm()
           .where((p) => p.status == status)
           .length;
 
+  /// Palms whose sensors are offline.
   static List<PalmData> offlinePalms() =>
       palmsForFarm().where((p) => !p.deviceOnline).toList();
 
+  /// Alerts of the selected farm.
   static List<AlertData> alertsForFarm({bool? current}) {
     final result = alerts
         .where((a) =>
@@ -488,11 +521,14 @@ class MockData {
     return result;
   }
 
+  /// Most recent alerts.
   static List<AlertData> recentAlerts() {
     return alertsForFarm(current: true).take(3).toList();
   }
+  /// Marks an alert as read.
   static void markRead(AlertData alert) => alert.isRead = true;
 
+  /// Records a treatment for a palm.
   static void recordTreatment(PalmData palm) {
     if (palm.status == PalmStatus.suspected) {
       palm.status = PalmStatus.underMonitoring;
