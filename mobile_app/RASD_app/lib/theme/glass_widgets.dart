@@ -1,3 +1,4 @@
+// Shared glass-style widgets: scaffold, boxes, app bar and the pop-up message.
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
@@ -207,18 +208,25 @@ class GlassCard extends StatelessWidget {
 }
 
 /// Shows a message in the middle of the screen.
-/// It closes by itself after 2 seconds, or when tapped.
+///
+/// A success message closes by itself after 2 seconds, or when tapped.
+/// An error message stays until the user taps OK, so there is enough time to
+/// read it. [title] is an optional bold line above the message.
 Future<void> showCenterMessage(
   BuildContext context,
   String text, {
   bool success = true,
+  String? title,
 }) {
   final navigator = Navigator.of(context);
   var isOpen = true;
 
-  Future.delayed(const Duration(seconds: 2), () {
-    if (isOpen && navigator.mounted) navigator.pop();
-  });
+  // Only success messages close on their own.
+  if (success) {
+    Future.delayed(const Duration(seconds: 2), () {
+      if (isOpen && navigator.mounted) navigator.pop();
+    });
+  }
 
   return showDialog<void>(
     context: context,
@@ -238,21 +246,41 @@ Future<void> showCenterMessage(
                   Icon(
                     success
                         ? Icons.check_circle_rounded
-                        : Icons.info_outline_rounded,
+                        : Icons.warning_amber_rounded,
                     size: 44,
                     color: success ? AppColors.primary : AppColors.monitoring,
                   ),
                   const SizedBox(height: 12),
+                  if (title != null) ...[
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   Text(
                     text,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontFamily: 'Cairo',
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textSecondary,
                     ),
                   ),
+                  if (!success) ...[
+                    const SizedBox(height: 14),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('OK'),
+                    ),
+                  ],
                 ],
               ),
             ),
