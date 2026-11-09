@@ -1,6 +1,8 @@
+// Reads alerts from Firebase Realtime Database.
 
 import 'package:firebase_database/firebase_database.dart';
 
+/// One alert from the database.
 class RasdAlert {
   final String id;
   final String farmId;
@@ -69,6 +71,7 @@ class RasdAlert {
   }
 }
 
+/// Reads alerts.
 class RasdAlertService {
   static final FirebaseDatabase _db =
       FirebaseDatabase.instance;
