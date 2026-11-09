@@ -1,3 +1,4 @@
+// Palm details screen: live sensor data, status and treatment history for one palm.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -6,6 +7,7 @@ import '../theme/app_colors.dart';
 import 'monitoring_history.dart';
 import 'treatment_record.dart';
 
+/// Palm details page.
 class PalmDetailsPage extends StatefulWidget {
   final String farmId;
   final String palmId;
@@ -48,6 +50,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     _configurePalmStream();
   }
 
+  /// Re-subscribes when the widget receives new parameters.
   @override
   void didUpdateWidget(covariant PalmDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -58,6 +61,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     }
   }
 
+  /// Subscribes to live updates for this palm.
   void _configurePalmStream() {
     _palmRef = FirebaseDatabase.instance.ref(
       'palms/${widget.farmId}/${widget.palmId}',
@@ -65,6 +69,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     _palmStream = _palmRef.onValue;
   }
 
+  /// Turns a raw status value into a readable label.
   String _statusLabel(Object? raw) {
     final value = (raw ?? '').toString().toLowerCase();
 
@@ -81,6 +86,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     }
   }
 
+  /// Maps a palm status to its colour.
   Color _statusColor(String status) {
     switch (status) {
       case 'Healthy':
@@ -94,6 +100,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     }
   }
 
+  /// Maps a palm status to its icon.
   IconData _statusIcon(String status) {
     switch (status) {
       case 'Healthy':
@@ -107,6 +114,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     }
   }
 
+  /// Formats a database timestamp for display.
   String _formatTimestamp(Object? value) {
     if (value == null) return 'No reading yet';
 
@@ -134,11 +142,13 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
         '${local.minute.toString().padLeft(2, '0')}';
   }
 
+  /// Formats a sensor value with its unit (or a dash when missing).
   String _measurement(Object? value, String unit) {
     if (value is! num) return 'No reading yet';
     return '${value.toStringAsFixed(1)}$unit';
   }
 
+  /// Full-screen loading indicator.
   Widget _loadingPage() {
     return Scaffold(
       appBar: AppBar(
@@ -151,6 +161,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     );
   }
 
+  /// Full-screen message page.
   Widget _messagePage(String message) {
     return Scaffold(
       appBar: AppBar(
@@ -245,6 +256,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     );
   }
 
+  /// Builds the main palm details content.
   Widget _buildDetails({
     required Map<String, dynamic> palm,
     required String status,
@@ -659,6 +671,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
   }
 }
 
+/// Row showing one live sensor value.
 class _LiveDataRow extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -730,6 +743,7 @@ class _LiveDataRow extends StatelessWidget {
   }
 }
 
+/// Row showing a label and a value.
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String title;
