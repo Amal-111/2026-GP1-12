@@ -1,3 +1,4 @@
+// Sign Up screen: creates the account, asks the user to verify their email, then saves the profile.
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -6,9 +7,12 @@ import '../data/mock_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
+import '../services/rasd_errors.dart';
 import 'auth_widgets.dart';
+import 'password_rules.dart';
 import 'login_page.dart';
 
+/// Sign Up page.
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -24,6 +28,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
+  /// Role chosen by the user (farm owner or farmer).
   UserRole _role = UserRole.farmOwner;
 
   @override
@@ -48,8 +53,11 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
+  /// True while a request is running (disables the button).
   bool _busy = false;
+  /// True after the verification email was sent.
   bool _awaitingVerification = false;
+  /// Creates the account (or finishes registration after email verification).
   Future<void> _createAccount() async {
     if (_busy) return;
     if (!_formKey.currentState!.validate()) return;
@@ -63,7 +71,11 @@ class _SignUpPageState extends State<SignUpPage> {
         );
         if (!mounted) return;
         setState(() => _awaitingVerification = true);
-        showCenterMessage(context, 'Verification email sent. Verify it, then tap Continue.');
+        showCenterMessage(
+          context,
+          'We sent a verification link to your email. Open it, then come back and tap Continue.',
+          title: 'Check your email',
+        );
       } else {
         await RasdAuthService.completeRegistration(
           name: _nameController.text, phone: _phoneController.text, role: _role,
@@ -72,7 +84,13 @@ class _SignUpPageState extends State<SignUpPage> {
         openAppAfterAuth(context);
       }
     } catch (error) {
-      if (mounted) showCenterMessage(context, RasdAuthService.message(error), success: false);
+      if (mounted) {
+        showRasdError(
+          context,
+          error,
+          title: _awaitingVerification ? 'Could not continue' : 'Could not sign up',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -138,12 +156,17 @@ class _SignUpPageState extends State<SignUpPage> {
                         const SizedBox(height: 14),
                         AppTextField(
                           label: 'Password',
-                          hint: 'At least 8 characters',
+                          hint: 'Create a strong password',
                           icon: Icons.lock_outline,
                           controller: _passwordController,
                           isPassword: true,
                           validator: _awaitingVerification ? (_) => null : AuthValidators.password,
                         ),
+                        // Live checklist of the password rules.
+                        if (!_awaitingVerification) ...[
+                          const SizedBox(height: 10),
+                          PasswordRulesBox(controller: _passwordController),
+                        ],
                         const SizedBox(height: 14),
                         AppTextField(
                           label: 'Confirm Password',
@@ -152,7 +175,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           controller: _confirmController,
                           isPassword: true,
                           validator: (v) => !_awaitingVerification && v != _passwordController.text
-                              ? 'Passwords do not match'
+                              ? 'Passwords do not match. Type the same password again.'
                               : null,
                         ),
                         const SizedBox(height: 14),
@@ -251,6 +274,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
+/// Selectable card for choosing a role.
 class _RoleCard extends StatelessWidget {
   final Widget icon;
   final String title;
