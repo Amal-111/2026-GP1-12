@@ -1,3 +1,4 @@
+// Lists the farmers of a farm and lets the owner search or remove them.
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
@@ -5,7 +6,9 @@ import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import 'assign_farmer_page.dart';
 import '../services/rasd_management_service.dart';
+import '../services/rasd_errors.dart';
 
+/// Manage Farmers page.
 class ManageFarmersPage extends StatefulWidget {
   const ManageFarmersPage({super.key});
 
@@ -22,6 +25,7 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     super.dispose();
   }
 
+  /// Filters farmers by the search text.
   List<FarmerData> _filteredFarmers(List<FarmerData> allFarmers) {
     final query = _searchController.text.trim().toLowerCase();
 
@@ -32,10 +36,12 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     }).toList();
   }
 
+  /// Shows a short centred message.
   void _showMessage(String text) {
     showCenterMessage(context, text);
   }
 
+  /// Asks for confirmation before removing the item.
   Future<void> _confirmDelete(FarmerData farmer) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -65,7 +71,9 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
         await RasdManagementService.removeFarmer(farmer.id);
         if (mounted) _showMessage('Farmer removed successfully.');
       } catch (error) {
-        if (mounted) showCenterMessage(context, error.toString(), success: false);
+        if (mounted) {
+          showRasdError(context, error, title: 'Could not remove the farmer');
+        }
       }
     }
   }
@@ -149,6 +157,7 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     );
   }
 
+  /// Builds one farmer row.
   Widget _buildFarmerCard(FarmerData farmer) {
     return GlassBox(
       padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
