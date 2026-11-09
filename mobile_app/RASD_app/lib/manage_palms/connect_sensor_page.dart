@@ -1,3 +1,4 @@
+// Connects a sensor device to a palm by its device ID.
 import 'package:flutter/material.dart';
 import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
@@ -5,6 +6,7 @@ import 'palm_store.dart';
 import 'add_palm_page.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_management_service.dart';
+import '../services/rasd_errors.dart';
 /// Step 3 of adding a palm: connect its monitoring sensor.
 /// A palm cannot be added without a sensor, so the palm is saved
 /// only when "Connect Sensor" succeeds.
@@ -39,8 +41,10 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
     super.dispose();
   }
 
+  /// True while saving (disables the button).
   bool _saving = false;
 
+  /// Connects the sensor to the palm.
   Future<void> _connect() async {
     final formOk = _formKey.currentState!.validate();
     final number = _deviceController.text.trim();
@@ -59,7 +63,9 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showCenterMessage(context, error.toString(), success: false);
+      if (mounted) {
+        showRasdError(context, error, title: 'Could not connect the sensor');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
