@@ -1,3 +1,4 @@
+// Screen shown to a farmer who is not assigned to a farm yet; lists pending invitations.
 
 import 'package:flutter/material.dart';
 import '../profile/profile_page.dart';
@@ -5,7 +6,9 @@ import '../services/rasd_management_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
+import '../services/rasd_errors.dart';
 
+/// Page for a farmer with no farm.
 class NoFarmAssigned extends StatefulWidget {
   const NoFarmAssigned({super.key});
 
@@ -16,6 +19,7 @@ class NoFarmAssigned extends StatefulWidget {
 class _NoFarmAssignedState extends State<NoFarmAssigned> {
   String? _busyInvitationId;
 
+  /// Accepts or declines an invitation, then refreshes the screen.
   Future<void> _respond(
       String invitationId, {
         required bool accept,
@@ -32,17 +36,19 @@ class _NoFarmAssignedState extends State<NoFarmAssigned> {
       }
 
       if (mounted && !accept) {
-        showCenterMessage(context, 'Invitation rejected.');
+        showCenterMessage(context, 'The invitation was rejected.');
       }
 
       // Home listens to users/{uid}.
       // Once farmId changes, Home automatically shows the farm pages.
     } catch (error) {
       if (mounted) {
-        showCenterMessage(
+        showRasdError(
           context,
-          error.toString(),
-          success: false,
+          error,
+          title: accept
+              ? 'Could not accept the invitation'
+              : 'Could not reject the invitation',
         );
       }
     } finally {
