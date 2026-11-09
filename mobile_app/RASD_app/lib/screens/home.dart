@@ -1,3 +1,4 @@
+// Home screen: farm summary, palm status counts, recent alerts and bottom navigation.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,7 +17,9 @@ import '../services/selected_farm_service.dart';
 
 import 'alerts.dart';
 import '../farm_assignment/no_farm_assigned.dart';
+import '../services/rasd_errors.dart';
 
+/// Home page.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseDatabase _db = FirebaseDatabase.instance;
 
+  /// Index of the selected bottom tab.
   int selectedTab = 0;
   PalmStatus? selectedPalmFilter;
 
@@ -39,10 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _alerts = [];
   Map<String, dynamic> _devices = {};
 
+  /// Live stream of the user's record.
   Stream<DatabaseEvent> _watchUser(String uid) {
     return _db.ref('users/$uid').onValue;
   }
 
+  /// Safely converts a database value into a map.
   Map<String, dynamic> _asMap(Object? value) {
     if (value is! Map) return {};
     return Map<String, dynamic>.from(value);
@@ -60,11 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  /// Safely reads a text value.
   String _text(Object? value, [String fallback = '']) {
     final result = value?.toString().trim() ?? '';
     return result.isEmpty ? fallback : result;
   }
 
+  /// Safely reads a date value.
   DateTime? _date(Object? value) {
     if (value is num) {
       final milliseconds =
@@ -80,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
+  /// Formats a date as day/month/year.
   String _formatDate(DateTime date) {
     date = date.toLocal();
     final day = date.day.toString().padLeft(2, '0');
@@ -90,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$day/$month/${date.year}  $hour:$minute';
   }
 
+  /// True when the palm's sensor has not reported recently.
   bool _isOffline(Map<String, dynamic> palm) {
     final deviceId = _text(palm['deviceId']);
 
@@ -103,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'offline';
   }
 
+  /// Reads the palm status as an enum.
   PalmStatus? _status(Map<String, dynamic> palm) {
     switch (_text(palm['healthStatus']).toLowerCase()) {
       case 'suspected':
@@ -117,10 +128,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Counts palms with the given status.
   int _countStatus(PalmStatus status) {
     return _palms.where((palm) => _status(palm) == status).length;
   }
 
+  /// Switches the bottom navigation tab.
   void _selectTab(int index) {
     setState(() {
       selectedTab = index;
@@ -130,6 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Opens the palm list filtered by status.
   void _openPalms(PalmStatus? status) {
     setState(() {
       selectedPalmFilter = status;
@@ -137,10 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Opens the alerts screen.
   void _openAlerts() {
     setState(() => selectedTab = 3);
   }
 
+  /// Opens the details of an alert.
   void _openAlertDetails(Map<String, dynamic> alert) {
     final rasdAlert = RasdAlert.fromMap(
       _text(alert['id']),
@@ -163,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (uid == null) {
       return const Scaffold(
         body: Center(
-          child: Text('Please sign in again.'),
+          child: Text('Your session has ended. Please log in again.'),
         ),
       );
     }
@@ -182,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final user = _asMap(userSnapshot.data!.snapshot.value);
 
         if (user.isEmpty) {
-          return _errorPage('Account profile not found.');
+          return _errorPage('We could not find your profile. Log out and log in again.');
         }
 
         final role = _text(user['role']);
@@ -190,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final isOwner = role == 'FarmOwner';
 
         if (!isFarmer && !isOwner) {
-          return _errorPage('Unsupported account role.');
+          return _errorPage('This account type is not supported.');
         }
 
         _isOwner = isOwner;
@@ -217,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (farmId.isEmpty) {
               return const Scaffold(
                 body: Center(
-                  child: Text('Please select a farm.'),
+                  child: Text('Choose a farm first.'),
                 ),
               );
             }
@@ -229,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the screen for the current farm data.
   Widget _buildFarm(
       String farmId, {
         String? ownerId,
@@ -249,11 +266,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final farm = _asMap(farmSnapshot.data!.snapshot.value);
 
         if (farm.isEmpty || farm['deleting'] == true) {
-          return _errorPage('Farm is unavailable.');
+          return _errorPage('This farm is not available right now.');
         }
 
         if (ownerId != null && farm['ownerId'] != ownerId) {
-          return _errorPage('You do not own this farm.');
+          return _errorPage('This farm belongs to another owner.');
         }
 
         _farmId = farmId;
@@ -312,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the scaffold with bottom navigation.
   Widget _buildMainScaffold() {
     Widget currentPage;
 
@@ -388,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the Home tab content.
   Widget _homePage() {
     final offlinePalms =
     _palms.where((palm) => _isOffline(palm)).toList();
@@ -697,6 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds one palm-status summary card.
   Widget _statusCard(
       PalmStatus status,
       IconData icon,
@@ -754,6 +774,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds one alert card.
   Widget _alertCard(Map<String, dynamic> alert) {
     final alertType = _text(alert['alertType']);
     final title = alertType == 'SensorOffline'
@@ -837,6 +858,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Shows the list of offline sensors.
   void _showOfflineSensors(
       List<Map<String, dynamic>> offlinePalms,
       ) {
@@ -911,6 +933,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Full-screen loading indicator.
   Widget _loadingPage() {
     return const Scaffold(
       body: Center(
@@ -919,13 +942,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Full-screen friendly error page.
   Widget _errorPage(Object? error) {
     return Scaffold(
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
+          // Our own text is shown as it is; any other error becomes a clear message.
           child: Text(
-            error.toString(),
+            error == null
+                ? RasdErrors.generic
+                : (error is String ? error : RasdErrors.message(error)),
             textAlign: TextAlign.center,
           ),
         ),
