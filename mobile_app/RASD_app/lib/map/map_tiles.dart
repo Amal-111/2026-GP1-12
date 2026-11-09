@@ -1,3 +1,4 @@
+// Map tile layers (street and satellite) used by all map screens.
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
