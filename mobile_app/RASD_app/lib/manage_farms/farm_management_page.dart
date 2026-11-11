@@ -11,7 +11,7 @@ import '../manage_palms/manage_palms_page.dart';
 import 'manage_farmers_page.dart';
 import 'farm_settings_page.dart';
 import 'invitations_page.dart';
-
+import '../data/auth_store.dart';
 /// Farm management page.
 class FarmManagementPage extends StatelessWidget {
   final String farmId;
@@ -28,10 +28,13 @@ class FarmManagementPage extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.hasError) return Scaffold(body: Center(child: Text('${snapshot.error}')));
         if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        final farm = snapshot.data!;
-        final palmCount = farm.palmCount;
+final farm = snapshot.data!;
+final palmCount = farm.palmCount;
 
-    return PalmScaffold(
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
         title: farm.name,
         leading: IconButton(
@@ -83,10 +86,10 @@ class FarmManagementPage extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            '$palmCount Palms',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+Text(
+isArabic ? '$palmCount نخلة' : '$palmCount Palms',
+style: Theme.of(context).textTheme.titleMedium,
+),
                         ],
                       ),
                     ),
@@ -108,10 +111,10 @@ class FarmManagementPage extends StatelessWidget {
                                 .onValue,
                             builder: (context, snapshot) {
                               if (snapshot.hasError) {
-                                return Text(
-                                  'Unable to load farmers',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                );
+return Text(
+isArabic ? 'تعذر تحميل المزارعين' : 'Unable to load farmers',
+style: Theme.of(context).textTheme.bodySmall,
+);
                               }
 
                               if (!snapshot.hasData) {
@@ -137,10 +140,12 @@ class FarmManagementPage extends StatelessWidget {
                                 }).length;
                               }
 
-                              return Text(
-                                '$farmerCount ${farmerCount == 1 ? 'Farmer' : 'Farmers'}',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              );
+return Text(
+isArabic
+? '$farmerCount مزارع'
+: '$farmerCount ${farmerCount == 1 ? 'Farmer' : 'Farmers'}',
+style: Theme.of(context).textTheme.titleMedium,
+);
                             },
                           ),
 
@@ -161,7 +166,7 @@ class FarmManagementPage extends StatelessWidget {
                         size: 42,
                         color: AppColors.primary,
                       ),
-                      title: 'Manage Palms',
+title: isArabic ? 'إدارة النخيل' : 'Manage Palms',
                       onTap: () {
                         Navigator.push(
                           context,
@@ -182,7 +187,7 @@ class FarmManagementPage extends StatelessWidget {
                         size: 42,
                         color: AppColors.primary,
                       ),
-                      title: 'Manage Farmers',
+title: isArabic ? 'إدارة المزارعين' : 'Manage Farmers',
                       onTap: () {
                         Navigator.push(
                           context,
@@ -200,7 +205,7 @@ class FarmManagementPage extends StatelessWidget {
               SizedBox(width: double.infinity,
                 child: _ManagementCard(
                   icon: const Icon(Icons.mail_outline, size: 42, color: AppColors.primary),
-                  title: 'Pending Invitations',
+title: isArabic ? 'الدعوات المعلقة' : 'Pending Invitations',
                   onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const InvitationsPage())),
                 ),
@@ -215,7 +220,7 @@ class FarmManagementPage extends StatelessWidget {
                   size: 42,
                   color: AppColors.primary,
                 ),
-                title: 'Farm Settings',
+title: isArabic ? 'إعدادات المزرعة' : 'Farm Settings',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -230,7 +235,9 @@ class FarmManagementPage extends StatelessWidget {
           ),
         ),
       ),
-    );
+);
+},
+);
       },
     );
   }

@@ -6,7 +6,7 @@ import 'palm_store.dart';
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_errors.dart';
-
+import '../data/auth_store.dart';
 /// Edit Palm: opens with the palm's current information filled in.
 /// Changes are applied only when "Save Changes" is pressed.
 class EditPalmPage extends StatefulWidget {
@@ -77,9 +77,13 @@ class _EditPalmPageState extends State<EditPalmPage> {
     if (!_hasChanges) {
       showCenterMessage(
         context,
-        'Change the age or the type, then tap Save.',
+        AuthStore.arabic.value
+            ? 'غيّر العمر أو النوع، ثم اضغط على حفظ.'
+            : 'Change the age or the type, then tap Save.',
         success: false,
-        title: 'Nothing to save',
+        title: AuthStore.arabic.value
+            ? 'لا توجد تغييرات للحفظ'
+            : 'Nothing to save',
       );
       return;
     }
@@ -101,7 +105,13 @@ class _EditPalmPageState extends State<EditPalmPage> {
     } catch (error) {
       if (!mounted) return;
 
-      showRasdError(context, error, title: 'Could not save the palm');
+      showRasdError(
+        context,
+        error,
+        title: AuthStore.arabic.value
+            ? 'تعذر حفظ النخلة'
+            : 'Could not save the palm',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -111,13 +121,16 @@ class _EditPalmPageState extends State<EditPalmPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.titleSmall;
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+final labelStyle = Theme.of(context).textTheme.titleSmall;
 
-    return PalmScaffold(
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Edit Palm',
+title: isArabic ? 'تعديل النخلة' : 'Edit Palm',
       ),
       body: SafeArea(
         child: Column(
@@ -137,31 +150,32 @@ class _EditPalmPageState extends State<EditPalmPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Palm ID - Read Only
-                        Text(
-                          'Palm ID',
-                          style: labelStyle,
-                        ),
+Text(
+isArabic ? 'معرّف النخلة' : 'Palm ID',
+style: labelStyle,
+),
 
                         const SizedBox(height: 8),
 
                         TextFormField(
                           controller: _idController,
                           readOnly: true,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.tag),
-                            prefixText: 'P',
-                            helperText:
-                            'Assigned by the system; cannot be changed',
-                          ),
+decoration: InputDecoration(
+prefixIcon: const Icon(Icons.tag),
+prefixText: 'P',
+helperText: isArabic
+? 'يتم تعيينه بواسطة النظام ولا يمكن تغييره'
+: 'Assigned by the system; cannot be changed',
+),
                         ),
 
                         const SizedBox(height: 18),
 
                         // Palm Age
-                        Text(
-                          'Age (years)',
-                          style: labelStyle,
-                        ),
+Text(
+isArabic ? 'العمر (بالسنوات)' : 'Age (years)',
+style: labelStyle,
+),
 
                         const SizedBox(height: 8),
 
@@ -176,16 +190,18 @@ class _EditPalmPageState extends State<EditPalmPage> {
                         const SizedBox(height: 18),
 
                         // Palm Type
-                        Text(
-                          'Type',
-                          style: labelStyle,
-                        ),
+Text(
+isArabic ? 'النوع' : 'Type',
+style: labelStyle,
+),
 
                         const SizedBox(height: 8),
 
                         DropdownButtonFormField<String>(
                           initialValue: _type,
-                          hint: const Text('Select palm type'),
+hint: Text(
+isArabic ? 'اختر نوع النخلة' : 'Select palm type',
+),
                           items: _withCurrent(
                             PalmStore.palmTypes,
                             _type,
@@ -206,10 +222,10 @@ class _EditPalmPageState extends State<EditPalmPage> {
                         const SizedBox(height: 18),
 
                         // Palm Status - Read Only
-                        Text(
-                          'Status',
-                          style: labelStyle,
-                        ),
+Text(
+isArabic ? 'الحالة' : 'Status',
+style: labelStyle,
+),
 
                         const SizedBox(height: 8),
 
@@ -230,10 +246,12 @@ class _EditPalmPageState extends State<EditPalmPage> {
                         const SizedBox(height: 18),
 
                         // Connected Sensor - Read Only
-                        Text(
-                          'Sensor: ${widget.palm.deviceId.isEmpty ? 'Not connected' : widget.palm.deviceId}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+Text(
+isArabic
+? 'المستشعر: ${widget.palm.deviceId.isEmpty ? 'غير متصل' : widget.palm.deviceId}'
+: 'Sensor: ${widget.palm.deviceId.isEmpty ? 'Not connected' : widget.palm.deviceId}',
+style: Theme.of(context).textTheme.bodySmall,
+),
                       ],
                     ),
                   ),
@@ -256,15 +274,21 @@ class _EditPalmPageState extends State<EditPalmPage> {
                       strokeWidth: 2,
                     ),
                   )
-                      : const Text('Save Changes'),
+: Text(
+isArabic ? 'حفظ التغييرات' : 'Save Changes',
+),
                 ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
+
+  /// Keeps the current value in the dropdown options.
 
   /// Keeps the current value in the dropdown options.
   List<String> _withCurrent(

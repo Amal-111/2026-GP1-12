@@ -6,7 +6,7 @@ import '../auth/password_rules.dart';
 import '../services/rasd_errors.dart';
 import '../services/firebase_auth_service.dart';
 import '../theme/glass_widgets.dart';
-
+import '../data/auth_store.dart';
 /// Pops with `true` when the password was changed.
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -43,8 +43,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         showRasdError(
           context,
           error,
-          title: 'Could not change password',
-          credentialMessage: 'The current password is not correct.',
+          title: AuthStore.arabic.value
+              ? 'تعذر تغيير كلمة المرور'
+              : 'Could not change password',
+
+          credentialMessage: AuthStore.arabic.value
+              ? 'كلمة المرور الحالية غير صحيحة.'
+              : 'The current password is not correct.',
         );
       }
     } finally {
@@ -52,11 +57,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Change Password',
+title: isArabic ? 'تغيير كلمة المرور' : 'Change Password',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
@@ -74,8 +82,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     child: Column(
                       children: [
                         AppTextField(
-                          label: 'Current Password',
-                          hint: 'Enter current password',
+label: isArabic ? 'كلمة المرور الحالية' : 'Current Password',
+hint: isArabic ? 'أدخل كلمة المرور الحالية' : 'Enter current password',
                           icon: Icons.lock_outline,
                           controller: _currentController,
                           isPassword: true,
@@ -85,8 +93,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'New Password',
-                          hint: 'Create a strong password',
+label: isArabic ? 'كلمة المرور الجديدة' : 'New Password',
+hint: isArabic ? 'أنشئ كلمة مرور قوية' : 'Create a strong password',
                           icon: Icons.lock_outline,
                           controller: _newController,
                           isPassword: true,
@@ -94,7 +102,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             final rules = PasswordRules.validate(v);
                             if (rules != null) return rules;
                             if (v == _currentController.text) {
-                              return 'The new password must be different from the current one.';
+return isArabic
+? 'يجب أن تختلف كلمة المرور الجديدة عن كلمة المرور الحالية.'
+: 'The new password must be different from the current one.';
                             }
                             return null;
                           },
@@ -104,13 +114,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         PasswordRulesBox(controller: _newController),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Confirm New Password',
-                          hint: 'Re-enter new password',
+label: isArabic ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password',
+hint: isArabic ? 'أعيد إدخال كلمة المرور الجديدة' : 'Re-enter new password',
                           icon: Icons.lock_outline,
                           controller: _confirmController,
                           isPassword: true,
                           validator: (v) => v != _newController.text
-                              ? 'Passwords do not match. Type the same password again.'
+? (isArabic
+? 'كلمتا المرور غير متطابقتين'
+: 'Passwords do not match. Type the same password again.')
                               : null,
                         ),
                       ],
@@ -130,7 +142,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     onPressed: (_busy || !PasswordRules.isStrong(_newController.text))
                         ? null
                         : _update,
-                    child: const Text('Update Password'),
+child: Text(
+isArabic ? 'تحديث كلمة المرور' : 'Update Password',
+),
                   ),
                 ),
               ),
@@ -138,6 +152,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }

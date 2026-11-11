@@ -9,7 +9,7 @@ import '../screens/home.dart';
 import 'farm_management_page.dart';
 import 'add_farm_page.dart';
 import '../profile/profile_page.dart';
-
+import '../data/auth_store.dart';
 /// Page listing the user's farms.
 class MyFarmsPage extends StatelessWidget {
   const MyFarmsPage({super.key});
@@ -24,11 +24,14 @@ class MyFarmsPage extends StatelessWidget {
     MockData.notifyChange();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'My Farms',
+title: isArabic ? 'مزارعي' : 'My Farms',
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -83,7 +86,9 @@ class MyFarmsPage extends StatelessWidget {
                         );
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Farm'),
+label: Text(
+isArabic ? 'إضافة مزرعة' : 'Add Farm',
+),
                     ),
                   ),
                 ),
@@ -93,7 +98,7 @@ class MyFarmsPage extends StatelessWidget {
                       ? Center(
                     child: GlassBox(
                       child: Text(
-                        'No farms found',
+isArabic ? 'لم يتم العثور على مزارع' : 'No farms found',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
@@ -107,10 +112,11 @@ class MyFarmsPage extends StatelessWidget {
                       final farm = farms[index];
                       final palmCount = farm.totalPalms;
 
-                      return _FarmCard(
-                        farm: farm,
-                        palmCount: palmCount,
-                        onTap: () {
+return _FarmCard(
+farm: farm,
+palmCount: palmCount,
+isArabic: isArabic,
+onTap: () {
                           SelectedFarmService.selectFarm(farm.id);
                           _selectFarmForLegacyScreens(farm);
 
@@ -141,23 +147,27 @@ class MyFarmsPage extends StatelessWidget {
           },
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 /// Card showing one farm in the list.
 class _FarmCard extends StatelessWidget {
-  final FarmRecord farm;
-  final int palmCount;
-  final VoidCallback onTap;
-  final VoidCallback onManage;
+final FarmRecord farm;
+final int palmCount;
+final bool isArabic;
+final VoidCallback onTap;
+final VoidCallback onManage;
 
-  const _FarmCard({
-    required this.farm,
-    required this.palmCount,
-    required this.onTap,
-    required this.onManage,
-  });
+const _FarmCard({
+required this.farm,
+required this.palmCount,
+required this.isArabic,
+required this.onTap,
+required this.onManage,
+});
 
   @override
   Widget build(BuildContext context) {
@@ -199,18 +209,20 @@ class _FarmCard extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                Text(
-                  '$palmCount Total Palms',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
+Text(
+isArabic ? '$palmCount النخيل ' : '$palmCount Total Palms',
+style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+color: AppColors.textSecondary,
+),
+),
 
                 const SizedBox(height: 10),
 
                 OutlinedButton(
                   onPressed: onManage,
-                  child: const Text('Manage'),
+child: Text(
+isArabic ? 'إدارة' : 'Manage',
+),
                 ),
               ],
             ),

@@ -15,7 +15,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
+import 'package:flutter_localizations/flutter_localizations.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -54,11 +54,33 @@ class RasdApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'RASD',
-      theme: AppTheme.lightTheme,
-      home: const _AuthGate(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AuthStore.arabic,
+      builder: (context, isArabic, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'RASD',
+          theme: AppTheme.lightTheme,
+
+          locale: isArabic
+              ? const Locale('ar')
+              : const Locale('en'),
+
+          supportedLocales: const [
+            Locale('en'),
+            Locale('ar'),
+          ],
+
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+
+          home: const _AuthGate(),
+
+        );
+      },
     );
   }
 }

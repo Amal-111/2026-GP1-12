@@ -9,7 +9,7 @@ import '../widgets/farm_photo.dart';
 import '../manage_palms/farm_location_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
-
+import '../data/auth_store.dart';
 /// Farm settings page.
 class FarmSettingsPage extends StatefulWidget {
   const FarmSettingsPage({super.key});
@@ -75,10 +75,11 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     await Navigator.push<({double latitude, double longitude})>(
       context,
       MaterialPageRoute(
-        builder: (_) => _FarmLocationPage(
-          latitude: _latitude,
-          longitude: _longitude,
-        ),
+        builder: (_) =>
+            _FarmLocationPage(
+              latitude: _latitude,
+              longitude: _longitude,
+            ),
       ),
     );
 
@@ -98,18 +99,26 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     if (name.isEmpty) {
       showCenterMessage(
         context,
-        'Enter the farm name before saving.',
+        AuthStore.arabic.value
+            ? 'أدخل اسم المزرعة قبل الحفظ.'
+            : 'Enter the farm name before saving.',
         success: false,
-        title: 'Farm name is missing',
+        title: AuthStore.arabic.value
+            ? 'اسم المزرعة غير موجود'
+            : 'Farm name is missing',
       );
       return;
     }
     if (_latitude == null || _longitude == null) {
       showCenterMessage(
         context,
-        'Tap the location box and choose where the farm is on the map.',
+        AuthStore.arabic.value
+            ? 'اضغط على مربع الموقع وحدد موقع المزرعة على الخريطة.'
+            : 'Tap the location box and choose where the farm is on the map.',
         success: false,
-        title: 'Farm location is missing',
+        title: AuthStore.arabic.value
+            ? 'موقع المزرعة غير محدد'
+            : 'Farm location is missing',
       );
       return;
     }
@@ -132,9 +141,9 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
           final imageUrl = _imagePath.isEmpty
               ? ''
               : await RasdFarmsService.uploadFarmImage(
-                  farmId: farmId,
-                  imagePath: _imagePath,
-                );
+            farmId: farmId,
+            imagePath: _imagePath,
+          );
           await RasdFarmsService.updateFarmImage(
             farmId: farmId,
             imageUrl: imageUrl,
@@ -143,16 +152,33 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
         } catch (error) {
           // The details were saved; only the photo failed.
           if (!mounted) return;
-          await showRasdError(context, error, title: 'Photo not saved');
+          await showRasdError(
+            context,
+            error,
+            title: AuthStore.arabic.value
+                ? 'لم يتم حفظ الصورة'
+                : 'Photo not saved',
+          );
           return;
         }
       }
 
       if (!mounted) return;
-      showCenterMessage(context, 'Farm information updated successfully.');
+      showCenterMessage(
+        context,
+        AuthStore.arabic.value
+            ? 'تم تحديث معلومات المزرعة بنجاح.'
+            : 'Farm information updated successfully.',
+      );
     } catch (error) {
       if (mounted) {
-        showRasdError(context, error, title: 'Could not save the farm');
+        showRasdError(
+          context,
+          error,
+          title: AuthStore.arabic.value
+              ? 'تعذر حفظ المزرعة'
+              : 'Could not save the farm',
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -165,28 +191,39 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Delete ${farm.name}?'),
-        content: const Text(
-          'Are you sure you want to delete this farm? '
-              'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
+      builder: (dialogContext) =>
+          AlertDialog(
+            title: Text(
+              AuthStore.arabic.value
+                  ? 'هل تريد حذف ${farm.name}؟'
+                  : 'Delete ${farm.name}?',
             ),
-            child: const Text('Delete'),
+            content: Text(
+              AuthStore.arabic.value
+                  ? 'هل أنت متأكد من حذف هذه المزرعة؟ لا يمكن التراجع عن هذا الإجراء.'
+                  : 'Are you sure you want to delete this farm? '
+                  'This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, false),
+                child: Text(
+                  AuthStore.arabic.value ? 'إلغاء' : 'Cancel',
+                ),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                ),
+                child: Text(
+                  AuthStore.arabic.value ? 'حذف' : 'Delete',
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (confirmed != true || !mounted) return;
@@ -195,7 +232,13 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
       await RasdManagementService.deleteFarm();
     } catch (error) {
       if (mounted) {
-        showRasdError(context, error, title: 'Could not delete the farm');
+        showRasdError(
+          context,
+          error,
+          title: AuthStore.arabic.value
+              ? 'تعذر حذف المزرعة'
+              : 'Could not delete the farm',
+        );
       }
       return;
     }
@@ -209,198 +252,213 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PalmScaffold(
-      appBar: glassAppBar(
-        title: 'Farm Settings',
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  20,
-                ),
-                child: GlassBox(
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      const _FieldLabel('Farm Photo'),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AuthStore.arabic,
+      builder: (context, isArabic, child) {
+        return PalmScaffold(
+          appBar: glassAppBar(
+            title: isArabic ? 'إعدادات المزرعة' : 'Farm Settings',
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      12,
+                      20,
+                      20,
+                    ),
+                    child: GlassBox(
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          _FieldLabel(isArabic ? 'صورة المزرعة' : 'Farm Photo'),
 
-                      // Add / change / remove the farm photo.
-                      FarmPhotoBox(
-                        imagePath: _imagePath,
-                        onChange: _pickImage,
-                        onRemove: () => setState(() => _imagePath = ''),
-                      ),
+                          // Add / change / remove the farm photo.
+                          FarmPhotoBox(
+                            imagePath: _imagePath,
+                            onChange: _pickImage,
+                            onRemove: () => setState(() => _imagePath = ''),
+                          ),
 
-                      const SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
-                      const _FieldLabel('Farm Name'),
+                          _FieldLabel(isArabic ? 'اسم المزرعة' : 'Farm Name'),
 
-                      TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          hintText: 'Enter farm name',
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      const _FieldLabel(
-                        'Description (optional)',
-                      ),
-
-                      TextField(
-                        controller:
-                        _descriptionController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText:
-                          'e.g. Location, notes, etc.',
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      const _FieldLabel('Location'),
-
-                      GlassBox(
-                        padding: EdgeInsets.zero,
-                        child: InkWell(
-                          borderRadius:
-                          BorderRadius.circular(18),
-                          onTap: _openLocationPicker,
-                          child: Padding(
-                            padding:
-                            const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on_outlined,
-                                  color: AppColors.primary,
-                                  size: 30,
-                                ),
-
-                                const SizedBox(width: 12),
-
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .start,
-                                    children: [
-                                      Text(
-                                        'Location',
-                                        style: Theme.of(
-                                          context,
-                                        )
-                                            .textTheme
-                                            .titleSmall,
-                                      ),
-
-                                      const SizedBox(
-                                        height: 2,
-                                      ),
-
-                                      Text(
-                                        _latitude != null &&
-                                            _longitude !=
-                                                null
-                                            ? '${_latitude!.toStringAsFixed(6)}, '
-                                            '${_longitude!.toStringAsFixed(6)}'
-                                            : MockData
-                                            .selectedFarm
-                                            .location,
-                                        style:
-                                        Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                          color:
-                                          AppColors
-                                              .textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  color:
-                                  AppColors.textSecondary,
-                                ),
-                              ],
+                          TextField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              hintText: isArabic
+                                  ? 'أدخل اسم المزرعة'
+                                  : 'Enter farm name',
                             ),
                           ),
-                        ),
+
+                          const SizedBox(height: 18),
+
+                          _FieldLabel(
+                            isArabic
+                                ? 'الوصف (اختياري)'
+                                : 'Description (optional)',
+                          ),
+
+                          TextField(
+                            controller:
+                            _descriptionController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: isArabic
+                                  ? 'مثال: الموقع، ملاحظات، وغيرها'
+                                  : 'e.g. Location, notes, etc.',
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          _FieldLabel(isArabic ? 'الموقع' : 'Location'),
+
+                          GlassBox(
+                            padding: EdgeInsets.zero,
+                            child: InkWell(
+                              borderRadius:
+                              BorderRadius.circular(18),
+                              onTap: _openLocationPicker,
+                              child: Padding(
+                                padding:
+                                const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on_outlined,
+                                      color: AppColors.primary,
+                                      size: 30,
+                                    ),
+
+                                    const SizedBox(width: 12),
+
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment
+                                            .start,
+                                        children: [
+                                          Text(
+                                            isArabic ? 'الموقع' : 'Location',
+                                            style: Theme
+                                                .of(
+                                              context,
+                                            )
+                                                .textTheme
+                                                .titleSmall,
+                                          ),
+
+                                          const SizedBox(
+                                            height: 2,
+                                          ),
+
+                                          Text(
+                                            _latitude != null &&
+                                                _longitude !=
+                                                    null
+                                                ? '${_latitude!.toStringAsFixed(
+                                                6)}, '
+                                                '${_longitude!.toStringAsFixed(
+                                                6)}'
+                                                : MockData
+                                                .selectedFarm
+                                                .location,
+                                            style:
+                                            Theme
+                                                .of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                              color:
+                                              AppColors
+                                                  .textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color:
+                                      AppColors.textSecondary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                0,
-                20,
-                10,
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _saveChanges,
-                  child: Text(
-                    _saving ? 'Saving...' : 'Save Changes',
-                  ),
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                0,
-                20,
-                16,
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _confirmDeleteFarm,
-                  icon: const Icon(
-                    Icons.delete_outline,
-                  ),
-                  label: const Text(
-                    'Delete Farm',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor:
-                    AppColors.error,
-                    side: const BorderSide(
-                      color: AppColors.error,
                     ),
                   ),
                 ),
-              ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    10,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _saveChanges,
+                      child: Text(
+                        _saving
+                            ? (isArabic ? 'جارٍ الحفظ...' : 'Saving...')
+                            : (isArabic ? 'حفظ التغييرات' : 'Save Changes'),
+                      ),
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    16,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _confirmDeleteFarm,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                      ),
+                      label: Text(
+                        isArabic ? 'حذف المزرعة' : 'Delete Farm',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor:
+                        AppColors.error,
+                        side: const BorderSide(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
-
 /// Full-screen map for choosing the farm location.
 class _FarmLocationPage extends StatefulWidget {
   final double? latitude;
@@ -429,11 +487,14 @@ class _FarmLocationPageState
     _longitude = widget.longitude;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Farm Location',
+title: isArabic ? 'موقع المزرعة' : 'Farm Location',
       ),
       body: SafeArea(
         child: Padding(
@@ -482,16 +543,19 @@ class _FarmLocationPageState
                       ),
                     );
                   },
-                  child:
-                  const Text('Use This Location'),
+child: Text(
+isArabic ? 'استخدم هذا الموقع' : 'Use This Location',
+),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
+),
+);
+},
+);
+}
 }
 
 /// Small label shown above a form field.

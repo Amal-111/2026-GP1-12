@@ -7,7 +7,7 @@ import '../theme/glass_widgets.dart';
 import 'assign_farmer_page.dart';
 import '../services/rasd_management_service.dart';
 import '../services/rasd_errors.dart';
-
+import '../data/auth_store.dart';
 /// Manage Farmers page.
 class ManageFarmersPage extends StatefulWidget {
   const ManageFarmersPage({super.key});
@@ -46,21 +46,31 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Remove ${farmer.name}?'),
-        content: const Text(
-          'Remove this farmer from your farm? Their account will not be deleted.',
+        title: Text(
+          AuthStore.arabic.value
+              ? 'هل تريد إزالة ${farmer.name}؟'
+              : 'Remove ${farmer.name}?',
+        ),
+        content: Text(
+          AuthStore.arabic.value
+              ? 'هل تريد إزالة هذا المزارع من مزرعتك؟ لن يتم حذف حسابه.'
+              : 'Remove this farmer from your farm? Their account will not be deleted.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(
+              AuthStore.arabic.value ? 'إلغاء' : 'Cancel',
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
             ),
-            child: const Text('Delete'),
+            child: Text(
+              AuthStore.arabic.value ? 'حذف' : 'Delete',
+            ),
           ),
         ],
       ),
@@ -69,20 +79,35 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
     if (confirmed == true) {
       try {
         await RasdManagementService.removeFarmer(farmer.id);
-        if (mounted) _showMessage('Farmer removed successfully.');
+        if (mounted) {
+          _showMessage(
+            AuthStore.arabic.value
+                ? 'تمت إزالة المزارع بنجاح.'
+                : 'Farmer removed successfully.',
+          );
+        }
       } catch (error) {
         if (mounted) {
-          showRasdError(context, error, title: 'Could not remove the farmer');
+          showRasdError(
+            context,
+            error,
+            title: AuthStore.arabic.value
+                ? 'تعذرت إزالة المزارع'
+                : 'Could not remove the farmer',
+          );
         }
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Manage Farmers',
+title: isArabic ? 'إدارة المزارعين' : 'Manage Farmers',
       ),
       body: SafeArea(
         child: StreamBuilder<List<FarmerData>>(
@@ -108,11 +133,17 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
                         );
 
                         if (assigned == true && mounted) {
-                          _showMessage('Invitation sent successfully.');
+_showMessage(
+isArabic
+? 'تم إرسال الدعوة بنجاح.'
+: 'Invitation sent successfully.',
+);
                         }
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Invite Farmer'),
+label: Text(
+isArabic ? 'دعوة مزارع' : 'Invite Farmer',
+),
                     ),
                   ),
                 ),
@@ -122,10 +153,10 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name...',
-                      prefixIcon: Icon(Icons.search),
-                    ),
+decoration: InputDecoration(
+hintText: isArabic ? 'ابحث بالاسم...' : 'Search by name...',
+prefixIcon: const Icon(Icons.search),
+),
                   ),
                 ),
 
@@ -134,7 +165,7 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
                       ? Center(
                     child: GlassBox(
                       child: Text(
-                        'No farmers found',
+isArabic ? 'لم يتم العثور على مزارعين' : 'No farmers found',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
@@ -154,8 +185,10 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
           },
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 
   /// Builds one farmer row.
   Widget _buildFarmerCard(FarmerData farmer) {
@@ -202,7 +235,7 @@ class _ManageFarmersPageState extends State<ManageFarmersPage> {
             onPressed: () => _confirmDelete(farmer),
             icon: const Icon(Icons.delete_outline),
             color: AppColors.error,
-            tooltip: 'Delete',
+tooltip: AuthStore.arabic.value ? 'حذف' : 'Delete',
           ),
         ],
       ),

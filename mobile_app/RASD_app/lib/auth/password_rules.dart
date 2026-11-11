@@ -1,44 +1,50 @@
 
+
 import 'package:flutter/material.dart';
- 
+
 import '../theme/app_colors.dart';
- 
-/// The password rules of the app, checked in one place.
-///
-/// Sign Up and Change Password both use this class, so the rules are always
-/// the same and the checklist on screen matches the validation.
+import '../data/auth_store.dart';
+
+/// The password rules of the app.
 class PasswordRules {
   PasswordRules._();
- 
-  /// The five rules, in the order they appear in the checklist.
-  static const List<String> labels = [
+
+  static const int rulesCount = 5;
+
+  static List<String> labels(bool isArabic) => isArabic
+      ? [
+    '8 أحرف على الأقل',
+    'حرف كبير (A-Z)',
+    'حرف صغير (a-z)',
+    'رقم (0-9)',
+    'رمز خاص (! @ # \$ ...)',
+  ]
+      : [
     'At least 8 characters',
     'An uppercase letter (A-Z)',
     'A lowercase letter (a-z)',
     'A number (0-9)',
     'A special character (! @ # \$ ...)',
   ];
- 
-  /// For [password], tells which of the five rules are met.
+
   static List<bool> check(String password) => [
-        password.length >= 8,
-        RegExp(r'[A-Z]').hasMatch(password),
-        RegExp(r'[a-z]').hasMatch(password),
-        RegExp(r'[0-9]').hasMatch(password),
-        RegExp(r'[^A-Za-z0-9\s]').hasMatch(password),
-      ];
- 
-  /// How many rules are met (0 to 5).
-  static int score(String password) => check(password).where((ok) => ok).length;
- 
-  /// True when every rule is met.
-  static bool isStrong(String password) => score(password) == labels.length;
- 
-  /// Error text for the field, or null when the password is strong.
-  /// The text names only the rules that are still missing.
+    password.length >= 8,
+    RegExp(r'[A-Z]').hasMatch(password),
+    RegExp(r'[a-z]').hasMatch(password),
+    RegExp(r'[0-9]').hasMatch(password),
+    RegExp(r'[^A-Za-z0-9\s]').hasMatch(password),
+  ];
+
+  static int score(String password) =>
+      check(password).where((ok) => ok).length;
+
+  static bool isStrong(String password) =>
+      score(password) == rulesCount;
+
   static String? validate(String? password) {
     final value = password ?? '';
     if (value.isEmpty) return 'This field is required.';
+
     final results = check(value);
     final missing = <String>[
       if (!results[0]) 'at least 8 characters',
@@ -47,42 +53,52 @@ class PasswordRules {
       if (!results[3]) 'a number',
       if (!results[4]) 'a special character',
     ];
+
     if (missing.isEmpty) return null;
     return 'Add ${_join(missing)}.';
   }
- 
-  /// Joins words as "a, b and c".
+
   static String _join(List<String> items) {
     if (items.length == 1) return items.first;
     return '${items.sublist(0, items.length - 1).join(', ')} and ${items.last}';
   }
 }
- 
+
 /// Checklist and strength bar shown under a password field.
-///
-/// It rebuilds every time the user types, because it listens to [controller].
 class PasswordRulesBox extends StatelessWidget {
   final TextEditingController controller;
- 
+
   const PasswordRulesBox({super.key, required this.controller});
- 
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([
+        controller,
+        AuthStore.arabic,
+      ]),
       builder: (context, _) {
+        final isArabic = AuthStore.arabic.value;
         final results = PasswordRules.check(controller.text);
         final score = PasswordRules.score(controller.text);
- 
-        // The bar has 4 parts: weak, fair, good, strong.
-        final filled = score == 0 ? 0 : (score <= 2 ? 1 : (score == 3 ? 2 : (score == 4 ? 3 : 4)));
+        final labels = PasswordRules.labels(isArabic);
+
+        final filled = score == 0
+            ? 0
+            : (score <= 2 ? 1 : (score == 3 ? 2 : (score == 4 ? 3 : 4)));
+
         final color = score <= 2
             ? AppColors.suspected
             : (score < 5 ? AppColors.monitoring : AppColors.primary);
-        final label = score == 0
+
+        final strengthLabel = score == 0
             ? ''
-            : (score <= 2 ? 'Weak' : (score < 5 ? 'Medium' : 'Strong'));
- 
+            : (score <= 2
+            ? (isArabic ? 'ضعيفة' : 'Weak')
+            : (score < 5
+            ? (isArabic ? 'متوسطة' : 'Medium')
+            : (isArabic ? 'قوية' : 'Strong')));
+
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -99,7 +115,9 @@ class PasswordRulesBox extends StatelessWidget {
                       child: Container(
                         height: 5,
                         decoration: BoxDecoration(
-                          color: i < filled ? color : const Color(0xFFE1E8E2),
+                          color: i < filled
+                              ? color
+                              : const Color(0xFFE1E8E2),
                           borderRadius: BorderRadius.circular(3),
                         ),
                       ),
@@ -109,7 +127,7 @@ class PasswordRulesBox extends StatelessWidget {
                   SizedBox(
                     width: 56,
                     child: Text(
-                      label,
+                      strengthLabel,
                       textAlign: TextAlign.end,
                       style: TextStyle(
                         fontFamily: 'Cairo',
@@ -122,7 +140,7 @@ class PasswordRulesBox extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              for (var i = 0; i < PasswordRules.labels.length; i++)
+              for (var i = 0; i < labels.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
@@ -138,7 +156,7 @@ class PasswordRulesBox extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        PasswordRules.labels[i],
+                        labels[i],
                         style: TextStyle(
                           fontFamily: 'Cairo',
                           fontSize: 12.5,

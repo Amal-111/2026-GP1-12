@@ -7,6 +7,7 @@ import 'add_palm_page.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_management_service.dart';
 import '../services/rasd_errors.dart';
+import '../data/auth_store.dart';
 /// Step 3 of adding a palm: connect its monitoring sensor.
 /// A palm cannot be added without a sensor, so the palm is saved
 /// only when "Connect Sensor" succeeds.
@@ -49,7 +50,10 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
     final formOk = _formKey.currentState!.validate();
     final number = _deviceController.text.trim();
     setState(() => _deviceError = number.isNotEmpty && PalmStore.isDigits(number)
-        ? null : 'Device ID must be a number.');
+        ? null
+        : (AuthStore.arabic.value
+        ? 'يجب أن يكون معرّف الجهاز رقمًا.'
+        : 'Device ID must be a number.'));
     if (!formOk || _deviceError != null || _saving) return;
 
     // Sensor IDs follow the existing D### naming convention.
@@ -64,17 +68,27 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
-        showRasdError(context, error, title: 'Could not connect the sensor');
+        showRasdError(
+          context,
+          error,
+          title: AuthStore.arabic.value
+              ? 'تعذر ربط المستشعر'
+              : 'Could not connect the sensor',
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
-      appBar: glassAppBar(title: 'Connect Sensor'),
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
+
+appBar: glassAppBar(title: isArabic ? 'ربط المستشعر' : 'Connect Sensor',),
       body: SafeArea(
         child: Column(
           children: [
@@ -92,10 +106,12 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                      _buildLinkedPalmCard(),
+                   _buildLinkedPalmCard(isArabic),
                       const SizedBox(height: 22),
-                      Text('Device ID',
-                          style: Theme.of(context).textTheme.titleSmall),
+Text(
+isArabic ? 'معرّف الجهاز' : 'Device ID',
+style: Theme.of(context).textTheme.titleSmall,
+),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _deviceController,
@@ -104,17 +120,21 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                         // Letters can be typed, but an error message appears.
                         onChanged: (value) {
                           setState(() {
-                            _deviceError = PalmStore.isDigits(value) ||
-                                    value.trim().isEmpty
+                                _deviceError = PalmStore.isDigits(value) ||
+                                value.trim().isEmpty
                                 ? null
-                                : 'Device ID must be a number.';
+                                : (AuthStore.arabic.value
+                                ? 'يجب أن يكون معرّف الجهاز رقمًا.'
+                                : 'Device ID must be a number.');
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'e.g. 8',
+hintText: isArabic ? 'مثال: 8' : 'e.g. 8',
                           prefixIcon: const Icon(Icons.sensors_rounded),
                           prefixText: 'D',
-                          helperText: 'Enter the number on the sensor',
+helperText: isArabic
+? 'أدخل الرقم الموجود على المستشعر'
+: 'Enter the number on the sensor',
                           errorText: _deviceError,
                         ),
                       ),
@@ -133,18 +153,22 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
                 child: ElevatedButton.icon(
                   onPressed: _saving ? null : _connect,
                   icon: const Icon(Icons.link_rounded),
-                  label: const Text('Connect Sensor'),
+label: Text(
+isArabic ? 'ربط المستشعر' : 'Connect Sensor',
+),
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+),
+);
+},
+);
+}
 
   /// Shows which palm this sensor will be linked to.
-  Widget _buildLinkedPalmCard() {
+Widget _buildLinkedPalmCard(bool isArabic) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -168,12 +192,19 @@ class _ConnectSensorPageState extends State<ConnectSensorPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Palm ID assigned after sensor pairing',
-                    style: Theme.of(context).textTheme.titleSmall),
-                Text(
-                  '${widget.type} · ${widget.age} yrs',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+Text(
+isArabic
+? 'سيتم تعيين معرّف النخلة بعد ربط المستشعر'
+: 'Palm ID assigned after sensor pairing',
+style: Theme.of(context).textTheme.titleSmall,
+),
+
+Text(
+isArabic
+? '${widget.type} · ${widget.age} سنة'
+: '${widget.type} · ${widget.age} yrs',
+style: Theme.of(context).textTheme.bodySmall,
+),
                 Text(
                   '${widget.latitude}, ${widget.longitude}',
                   style: Theme.of(context).textTheme.bodySmall,

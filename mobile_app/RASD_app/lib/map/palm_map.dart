@@ -11,7 +11,7 @@ import '../theme/glass_widgets.dart';
 import '../list/palm_details.dart';
 import '../services/selected_farm_service.dart';
 import 'map_tiles.dart';
-
+import '../data/auth_store.dart';
 /// Farm map: real map (satellite or street) with a marker for each palm.
 /// Tap a marker to see the palm and open its details.
 class FarmMapPage extends StatefulWidget {
@@ -243,17 +243,25 @@ class _FarmMapPageState extends State<FarmMapPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final list = palms;
-    final farmName = _farmName;
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+final list = palms;
+final farmName = _farmName;
 
-    return Scaffold(
+return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: Text(farmName),
+title: Text(
+farmName == 'Farm Map'
+? (isArabic ? 'خريطة المزرعة' : 'Farm Map')
+: farmName,
+),
       ),
       body: SafeArea(
         child: Padding(
@@ -315,13 +323,15 @@ class _FarmMapPageState extends State<FarmMapPage> {
                         icon: _satellite
                             ? Icons.map_outlined
                             : Icons.satellite_alt,
-                        tooltip: _satellite ? 'Street map' : 'Satellite',
+tooltip: _satellite
+? (isArabic ? 'خريطة الشوارع' : 'Street map')
+: (isArabic ? 'القمر الصناعي' : 'Satellite'),
                         onTap: () => setState(() => _satellite = !_satellite),
                       ),
                       const SizedBox(height: 8),
                       MapRoundButton(
                         icon: Icons.add,
-                        tooltip: 'Zoom in',
+tooltip: isArabic ? 'تكبير' : 'Zoom in',
                         onTap: () => _mapController.move(
                           _mapController.camera.center,
                           _mapController.camera.zoom + 1,
@@ -330,7 +340,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
                       const SizedBox(height: 8),
                       MapRoundButton(
                         icon: Icons.remove,
-                        tooltip: 'Zoom out',
+tooltip: isArabic ? 'تصغير' : 'Zoom out',
                         onTap: () => _mapController.move(
                           _mapController.camera.center,
                           _mapController.camera.zoom - 1,
@@ -339,7 +349,7 @@ class _FarmMapPageState extends State<FarmMapPage> {
                       const SizedBox(height: 8),
                       MapRoundButton(
                         icon: Icons.center_focus_strong,
-                        tooltip: 'Show whole farm',
+tooltip: isArabic ? 'عرض المزرعة كاملة' : 'Show whole farm',
                         onTap: () => _showWholeFarm(list),
                       ),
                     ],
@@ -353,11 +363,12 @@ class _FarmMapPageState extends State<FarmMapPage> {
                     right: 70,
                     top: 12,
                     child: _PalmInfoCard(
-                      palm: selectedPalm!,
-                      color: statusColor(selectedPalm!.displayStatus),
-                      onClose: () => setState(() => selectedPalm = null),
-                      onViewDetails: () => openPalmDetails(selectedPalm!),
-                    ),
+palm: selectedPalm!,
+color: statusColor(selectedPalm!.displayStatus),
+isArabic: isArabic,
+onClose: () => setState(() => selectedPalm = null),
+onViewDetails: () => openPalmDetails(selectedPalm!),
+),
                   ),
 
                 // Status legend.
@@ -365,15 +376,19 @@ class _FarmMapPageState extends State<FarmMapPage> {
                   left: 8,
                   right: 8,
                   bottom: 28,
-                  child: _StatusLegend(getColor: statusColor),
+                  child: _StatusLegend(getColor: statusColor,isArabic: isArabic,),
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
+);
+},
+);
   }
+
+/// _FarmMapPageState
 }
 
 /// A palm shown on the map.
@@ -442,12 +457,14 @@ class _PalmInfoCard extends StatelessWidget {
   final Color color;
   final VoidCallback onClose;
   final VoidCallback onViewDetails;
+final bool isArabic;
 
   const _PalmInfoCard({
     required this.palm,
     required this.color,
     required this.onClose,
     required this.onViewDetails,
+    required this.isArabic,
   });
 
   @override
@@ -478,9 +495,11 @@ class _PalmInfoCard extends StatelessWidget {
                       palm.id,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    Text(
-                      palm.displayStatus,
-                      style: TextStyle(
+Text(
+isArabic
+? _translateMapStatus(palm.displayStatus)
+: palm.displayStatus,
+style: TextStyle(
                         fontFamily: 'Cairo',
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -492,7 +511,7 @@ class _PalmInfoCard extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onClose,
-                tooltip: 'Close',
+tooltip: isArabic ? 'إغلاق' : 'Close',
                 icon: const Icon(Icons.close_rounded),
               ),
             ],
@@ -505,7 +524,7 @@ class _PalmInfoCard extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: onViewDetails,
                 icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('View Palm Details'),
+label: Text(isArabic ? 'عرض تفاصيل النخلة' : 'View Palm Details'),
               ),
             ),
           ),
@@ -515,12 +534,29 @@ class _PalmInfoCard extends StatelessWidget {
   }
 }
 
+String _translateMapStatus(String status) {
+switch (status) {
+case 'Healthy':
+return 'سليمة';
+case 'Suspected':
+return 'مشتبه بالإصابة';
+case 'Monitoring':
+return 'تحت المراقبة';
+case 'Offline':
+return 'غير متصل';
+default:
+return status;
+}
+}
+
 // Legend for the palm statuses.
 class _StatusLegend extends StatelessWidget {
   final Color Function(String) getColor;
+final bool isArabic;
 
   const _StatusLegend({
     required this.getColor,
+required this.isArabic,
   });
 
   @override
@@ -552,9 +588,9 @@ class _StatusLegend extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 5),
-                  Text(
-                    status,
-                    style: const TextStyle(
+Text(
+isArabic ? _translateMapStatus(status) : status,
+style: const TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 11,
                       fontWeight: FontWeight.w600,

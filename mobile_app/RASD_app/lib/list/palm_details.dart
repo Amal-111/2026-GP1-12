@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../theme/palm_icon.dart';
 import '../theme/app_colors.dart';
-import 'monitoring_history.dart';
-import 'treatment_record.dart';
-
+import 'palm_records_page.dart';
+import '../data/auth_store.dart';
 /// Palm details page.
 class PalmDetailsPage extends StatefulWidget {
   final String farmId;
   final String palmId;
+
 
   // Kept for compatibility with existing navigation calls.
   final String status;
@@ -33,6 +33,8 @@ class PalmDetailsPage extends StatefulWidget {
     this.deviceId = '',
     this.onViewHistory,
     this.onManageTreatment,
+
+
   });
 
   @override
@@ -116,7 +118,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
 
   /// Formats a database timestamp for display.
   String _formatTimestamp(Object? value) {
-    if (value == null) return 'No reading yet';
+    if (value == null) {
+      return AuthStore.arabic.value
+          ? 'لا توجد قراءة حتى الآن'
+          : 'No reading yet';
+    }
 
     DateTime? date;
 
@@ -131,7 +137,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
       date = DateTime.tryParse(value);
     }
 
-    if (date == null) return 'No reading yet';
+    if (date == null) {
+      return AuthStore.arabic.value
+          ? 'لا توجد قراءة حتى الآن'
+          : 'No reading yet';
+    }
 
     final local = date.toLocal();
 
@@ -144,7 +154,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
 
   /// Formats a sensor value with its unit (or a dash when missing).
   String _measurement(Object? value, String unit) {
-    if (value is! num) return 'No reading yet';
+    if (value is! num) {
+      return AuthStore.arabic.value
+          ? 'لا توجد قراءة حتى الآن'
+          : 'No reading yet';
+    }
     return '${value.toStringAsFixed(1)}$unit';
   }
 
@@ -152,7 +166,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
   Widget _loadingPage() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Palm Details'),
+        title: Text(
+          AuthStore.arabic.value
+              ? 'تفاصيل النخلة'
+              : 'Palm Details',
+        ),
         centerTitle: true,
       ),
       body: const Center(
@@ -165,7 +183,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
   Widget _messagePage(String message) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Palm Details'),
+        title: Text(
+          AuthStore.arabic.value
+              ? 'تفاصيل النخلة'
+              : 'Palm Details',
+        ),
         centerTitle: true,
       ),
       body: Center(
@@ -180,16 +202,21 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DatabaseEvent>(
+@override
+Widget build(BuildContext context) {
+
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return StreamBuilder<DatabaseEvent>(
       stream: _palmStream,
       builder: (context, palmSnapshot) {
         if (palmSnapshot.hasError) {
-          return _messagePage(
-            'Unable to load palm details:\n'
-                '${palmSnapshot.error}',
-          );
+return _messagePage(
+isArabic
+? 'تعذر تحميل تفاصيل النخلة:\n${palmSnapshot.error}'
+: 'Unable to load palm details:\n${palmSnapshot.error}',
+);
         }
 
         if (!palmSnapshot.hasData) {
@@ -199,7 +226,9 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
         final rawPalm = palmSnapshot.data!.snapshot.value;
 
         if (rawPalm is! Map) {
-          return _messagePage('Palm not found.');
+return _messagePage(
+isArabic ? 'لم يتم العثور على النخلة.' : 'Palm not found.',
+);
         }
 
         final palm = Map<String, dynamic>.from(rawPalm);
@@ -227,10 +256,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
               .onValue,
           builder: (context, deviceSnapshot) {
             if (deviceSnapshot.hasError) {
-              return _messagePage(
-                'Unable to load sensor data:\n'
-                    '${deviceSnapshot.error}',
-              );
+return _messagePage(
+isArabic
+? 'تعذر تحميل بيانات المستشعر:\n${deviceSnapshot.error}'
+: 'Unable to load sensor data:\n${deviceSnapshot.error}',
+);
             }
 
             if (!deviceSnapshot.hasData) {
@@ -253,8 +283,10 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
           },
         );
       },
-    );
-  }
+);
+},
+);
+}
 
   /// Builds the main palm details content.
   Widget _buildDetails({
@@ -265,6 +297,17 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
   }) {
     final statusColor = _statusColor(status);
     final isSuspected = status == 'Suspected';
+    final isArabic = AuthStore.arabic.value;
+
+    final displayStatus = isArabic
+        ? (status == 'Healthy'
+        ? 'سليمة'
+        : status == 'Suspected'
+        ? 'مشتبه بالإصابة'
+        : status == 'Under Monitoring'
+        ? 'تحت المراقبة'
+        : 'غير معروف')
+        : status;
 
     final temperatureText = _measurement(
       device['temperature'],
@@ -281,8 +324,15 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
     );
 
     final connectionStatus =
-    (device['connectionStatus'] ?? 'Unknown')
-        .toString();
+    (device['connectionStatus'] ?? 'Unknown').toString();
+
+    final displayConnectionStatus = isArabic
+        ? (connectionStatus == 'Online'
+        ? 'متصل'
+        : connectionStatus == 'Offline'
+        ? 'غير متصل'
+        : 'غير معروف')
+        : connectionStatus;
 
     final isOnline = connectionStatus == 'Online';
 
@@ -291,15 +341,17 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
         : AppColors.textSecondary;
 
     final palmType =
-    (palm['palmType'] ?? 'Not available').toString();
+    (palm['palmType'] ?? (isArabic ? 'غير متاح' : 'Not available')).toString();
 
     final palmAge = palm['age'] is num
-        ? '${palm['age']} years'
-        : 'Not available';
+        ? (isArabic ? '${palm['age']} سنة' : '${palm['age']} years')
+        : (isArabic ? 'غير متاح' : 'Not available');
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Palm Details'),
+        title: Text(
+          isArabic ? 'تفاصيل النخلة' : 'Palm Details',
+        ),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -366,7 +418,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
-                                      status,
+                                      displayStatus,
                                       style: TextStyle(
                                         fontFamily: 'Cairo',
                                         fontSize: 13,
@@ -418,9 +470,11 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                           crossAxisAlignment:
                           CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Potential Infestation Detected',
-                              style: TextStyle(
+                            Text(
+                              isArabic
+                                  ? 'اشتباه بوجود إصابة'
+                                  : 'Potential Infestation Detected',
+                              style: const TextStyle(
                                 fontFamily: 'Cairo',
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -429,8 +483,12 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Possible signs of Red Palm Weevil '
-                                  'activity have been detected. '
+                              isArabic
+                                  ? 'تم رصد علامات محتملة '
+                                  'لنشاط سوسة النخيل الحمراء'
+                                  ' قد يتطلب الأمر إجراء فحص إضافي.'
+                                  : 'Possible signs of Red Palm Weevil activity'
+                                  ' have been detected '
                                   'Further inspection may be required.',
                               style: Theme.of(context)
                                   .textTheme.bodySmall
@@ -456,32 +514,31 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                     CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Palm Information',
-                        style: Theme.of(context)
-                            .textTheme.titleMedium,
+                        isArabic ? 'معلومات النخلة' : 'Palm Information',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 16),
                       _InfoRow(
                         icon: Icons.park_outlined,
-                        title: 'Palm Type',
+                        title: isArabic ? 'نوع النخلة' : 'Palm Type',
                         value: palmType,
                       ),
                       const Divider(height: 24),
                       _InfoRow(
                         icon: Icons.calendar_today_outlined,
-                        title: 'Palm Age',
+                        title: isArabic ? 'عمر النخلة' : 'Palm Age',
                         value: palmAge,
                       ),
                       const Divider(height: 24),
                       _InfoRow(
                         icon: Icons.location_on_outlined,
-                        title: 'Location',
+                        title: isArabic ? 'الموقع' : 'Location',
                         value:
                         palm['latitude'] is num &&
                             palm['longitude'] is num
                             ? '${palm['latitude']}, '
                             '${palm['longitude']}'
-                            : 'Not available',
+                            : (isArabic ? 'غير متاح' : 'Not available'),
                       ),
                     ],
                   ),
@@ -499,7 +556,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const TabBar(
+                       TabBar(
                         labelColor: AppColors.primary,
                         unselectedLabelColor:
                         AppColors.textSecondary,
@@ -510,10 +567,10 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                         ),
-                        tabs: [
-                          Tab(text: 'Live Data'),
-                          Tab(text: 'Device Info'),
-                        ],
+                         tabs: [
+                           Tab(text: isArabic ? 'البيانات المباشرة' : 'Live Data'),
+                           Tab(text: isArabic ? 'معلومات الجهاز' : 'Device Info'),
+                         ],
                       ),
                       SizedBox(
                         height: 255,
@@ -528,28 +585,28 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                                   _LiveDataRow(
                                     icon: Icons
                                         .thermostat_rounded,
-                                    title: 'Temperature',
+                                    title: isArabic ? 'درجة الحرارة' : 'Temperature',
                                     value: temperatureText,
                                   ),
                                   const Divider(height: 20),
                                   _LiveDataRow(
                                     icon: Icons
                                         .water_drop_rounded,
-                                    title: 'Humidity',
+                                    title: isArabic ? 'الرطوبة' : 'Humidity',
                                     value: humidityText,
                                   ),
                                   const Divider(height: 20),
                                   _LiveDataRow(
                                     icon: Icons
                                         .access_time_rounded,
-                                    title: 'Last Update',
+                                    title: isArabic ? 'آخر تحديث' : 'Last Update',
                                     value: lastUpdateText,
                                   ),
                                   const Divider(height: 20),
                                   _LiveDataRow(
                                     icon: Icons.sensors_rounded,
-                                    title: 'Sensor Status',
-                                    value: connectionStatus,
+                                    title: isArabic ? 'حالة المستشعر' : 'Sensor Status',
+                                    value: displayConnectionStatus,
                                     valueColor:
                                     connectionColor,
                                     valueIcon: Icons.circle,
@@ -568,30 +625,29 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
                                 children: [
                                   _LiveDataRow(
                                     icon: Icons.tag_rounded,
-                                    title: 'Sensor ID',
+                                    title: isArabic ? 'معرّف المستشعر' : 'Sensor ID',
                                     value: deviceId.isEmpty
-                                        ? 'Not connected'
+                                        ? (isArabic ? 'غير متصل' : 'Not connected')
                                         : deviceId,
                                   ),
                                   const Divider(height: 20),
-                                  const _LiveDataRow(
-                                    icon: Icons
-                                        .sensors_rounded,
-                                    title: 'Vibration Sensor',
-                                    value: 'Piezoelectric',
+                                  _LiveDataRow(
+                                    icon: Icons.sensors_rounded,
+                                    title: isArabic ? 'مستشعر الاهتزاز' : 'Vibration Sensor',
+                                    value: isArabic ? 'مستشعر كهرضغطي' : 'Piezoelectric',
                                   ),
                                   const Divider(height: 20),
-                                  const _LiveDataRow(
-                                    icon: Icons
-                                        .thermostat_rounded,
-                                    title:
-                                    'Environmental Sensor',
+                                  _LiveDataRow(
+                                    icon: Icons.thermostat_rounded,
+                                    title: isArabic ? 'المستشعر البيئي' : 'Environmental Sensor',
                                     value: 'DHT22',
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Measures temperature '
-                                        'and humidity',
+                                    isArabic
+                                        ? 'يقيس درجة الحرارة والرطوبة'
+                                        : 'Measures temperature'
+                                             'and humidity',
                                     style: Theme.of(context)
                                         .textTheme.bodySmall,
                                   ),
@@ -608,58 +664,26 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
 
               const SizedBox(height: 28),
 
-              // Monitoring history
+              // Palm Records
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    if (widget.onViewHistory != null) {
-                      widget.onViewHistory!();
-                      return;
-                    }
-
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            MonitoringHistoryPage(
-                              farmId: widget.farmId,
-                              palmId: widget.palmId,
-                            ),
+                        builder: (_) => PalmRecordsPage(
+                          farmId: widget.farmId,
+                          palmId: widget.palmId,
+                          initialIndex: 0,
+                          onMarkedTreated: widget.onManageTreatment,
+                        ),
                       ),
                     );
                   },
-                  icon: const Icon(
-                    Icons.history_rounded,
-                  ),
-                  label: const Text('View History'),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Treatment records
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            TreatmentRecordPage(
-                              farmId: widget.farmId,
-                              palmId: widget.palmId,
-                              onMarkedTreated: widget.onManageTreatment,
-                            ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.medical_services_outlined,
-                  ),
-                  label: const Text(
-                    'Manage Treatment',
+                  icon: const Icon(Icons.folder_outlined),
+                  label: Text(
+                    isArabic ? 'سجلات النخلة' : 'Palm Records',
                   ),
                 ),
               ),

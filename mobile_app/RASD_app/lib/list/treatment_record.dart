@@ -6,18 +6,20 @@ import '../theme/app_colors.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../services/rasd_errors.dart';
-
+import '../data/auth_store.dart';
 /// Treatment record page.
 class TreatmentRecordPage extends StatefulWidget {
   final String palmId;
   final String farmId;
   final VoidCallback? onMarkedTreated;
+  final bool showAppBar;
 
   const TreatmentRecordPage({
     super.key,
     required this.palmId,
     required this.farmId,
     this.onMarkedTreated,
+    this.showAppBar = true,
   });
 
   @override
@@ -131,9 +133,13 @@ class _TreatmentRecordPageState
     if (_selectedMethod == null) {
       showCenterMessage(
         context,
-        'Choose how the palm was treated, then save.',
+        AuthStore.arabic.value
+            ? 'اختر طريقة علاج النخلة ثم احفظ.'
+            : 'Choose how the palm was treated, then save.',
         success: false,
-        title: 'Treatment method is missing',
+        title: AuthStore.arabic.value
+            ? 'طريقة العلاج غير محددة'
+            : 'Treatment method is missing',
       );
       return;
     }
@@ -167,41 +173,63 @@ class _TreatmentRecordPageState
       });
       widget.onMarkedTreated?.call();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Treatment record added successfully.'),
+        SnackBar(
+          content: Text(
+            AuthStore.arabic.value
+                ? 'تمت إضافة سجل العلاج بنجاح.'
+                : 'Treatment record added successfully.',
+          ),
           backgroundColor: AppColors.primary,
         ),
       );
     } catch (e) {
       // RasdErrors turns Firebase and other errors into a clear message.
       if (!mounted) return;
-      showRasdError(context, e, title: 'Could not save the treatment');
+      showRasdError(
+        context,
+        e,
+        title: AuthStore.arabic.value
+            ? 'تعذر حفظ العلاج'
+            : 'Could not save the treatment',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Treatment Record'),
-        centerTitle: true,
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+  return Scaffold(
+    appBar: widget.showAppBar
+        ? AppBar(
+      title: Text(
+        isArabic ? 'سجل العلاج' : 'Treatment Record',
       ),
-      body: SafeArea(
+      centerTitle: true,
+    )
+        : null,
+    body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             20, 12, 20, 24,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+
             children: [
-              GlassLabel(child: Text(
-                'Treatment  •  ${widget.palmId}',
+              SizedBox(
+                width: double.infinity,
+                child:GlassLabel(child: Text(
+isArabic
+? 'العلاج  •  ${widget.palmId}'
+: 'Treatment  •  ${widget.palmId}',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge,
-              )),
+              )),),
               const SizedBox(height: 20),
 
               // Treatment form
@@ -226,14 +254,16 @@ class _TreatmentRecordPageState
                     CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Mark as Treated',
+isArabic ? 'تسجيل العلاج' : 'Mark as Treated',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Record treatment after inspecting the palm.',
+isArabic
+? 'سجّل العلاج بعد فحص النخلة.'
+: 'Record treatment after inspecting the palm.',
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall,
@@ -242,7 +272,7 @@ class _TreatmentRecordPageState
 
                       // Treatment date
                       Text(
-                        'Treatment Date',
+isArabic ? 'تاريخ العلاج' : 'Treatment Date',
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -276,7 +306,7 @@ class _TreatmentRecordPageState
 
                       // Treatment method
                       Text(
-                        'Treatment Method',
+isArabic ? 'طريقة العلاج' : 'Treatment Method',
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -288,9 +318,9 @@ class _TreatmentRecordPageState
                       DropdownButtonFormField<String>(
                         value: _selectedMethod,
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Select method',
-                          prefixIcon: Icon(
+                        decoration: InputDecoration(
+hintText: isArabic ? 'اختر طريقة العلاج' : 'Select method',
+                          prefixIcon: const Icon(
                             Icons.science_outlined,
                           ),
                         ),
@@ -298,7 +328,15 @@ class _TreatmentRecordPageState
                           return DropdownMenuItem<String>(
                             value: method,
                             child: Text(
-                              method,
+                              isArabic
+                                  ? (method == 'Chemical Treatment'
+                                  ? 'علاج كيميائي'
+                                  : method == 'Biological Treatment'
+                                  ? 'علاج بيولوجي'
+                                  : method == 'Mechanical Treatment'
+                                  ? 'علاج ميكانيكي'
+                                  : 'أخرى')
+                                  : method,
                               overflow: TextOverflow.ellipsis,
                             ),
                           );
@@ -313,7 +351,7 @@ class _TreatmentRecordPageState
 
                       // Optional notes
                       Text(
-                        'Notes (optional)',
+isArabic ? 'ملاحظات (اختياري)' : 'Notes (optional)',
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -326,8 +364,8 @@ class _TreatmentRecordPageState
                         controller: _notesController,
                         minLines: 3,
                         maxLines: 5,
-                        decoration: const InputDecoration(
-                          hintText: 'Add any notes...',
+                        decoration: InputDecoration(
+hintText: isArabic ? 'أضف أي ملاحظات...' : 'Add any notes...',
                           alignLabelWithHint: true,
                         ),
                       ),
@@ -357,12 +395,17 @@ class _TreatmentRecordPageState
               const SizedBox(height: 28),
 
               // Treatment history heading
-              GlassLabel(child: Text(
-                'Treatment History',
+      SizedBox(
+        width: double.infinity,
+        child: GlassLabel(
+            child: Text(
+isArabic ? 'سجل العلاجات' : 'Treatment History',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge,
-              )),
+              )
+              ),
+      ),
               const SizedBox(height: 12),
 
               // Empty state or previous treatments
@@ -374,7 +417,11 @@ class _TreatmentRecordPageState
                       margin: EdgeInsets.zero,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
-                        child: Text('Unable to load treatment records: ${snapshot.error}'),
+child: Text(
+isArabic
+? 'تعذر تحميل سجلات العلاج: ${snapshot.error}'
+: 'Unable to load treatment records: ${snapshot.error}',
+),
                       ),
                     );
                   }
@@ -404,7 +451,7 @@ class _TreatmentRecordPageState
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'No treatment records yet',
+isArabic ? 'لا توجد سجلات علاج حتى الآن' : 'No treatment records yet',
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium,
@@ -412,8 +459,11 @@ class _TreatmentRecordPageState
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'The treatment records will appear here '
-                                  'after marking the palm as treated.',
+isArabic
+? 'ستظهر سجلات العلاج هنا'
+' بعد تسجيل علاج النخلة.'
+: 'The treatment records will appear here'
+' after marking the palm as treated.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -499,6 +549,8 @@ class _TreatmentRecordPageState
           ),
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }

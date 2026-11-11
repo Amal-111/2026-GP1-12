@@ -8,7 +8,7 @@ import '../manage_palms/add_palm_page.dart';
 import 'palm_details.dart';
 import '../services/rasd_errors.dart';
 import '../theme/glass_widgets.dart';
-
+import '../data/auth_store.dart';
 /// Palm list page.
 class PalmListPage extends StatefulWidget {
   final String farmId;
@@ -144,7 +144,9 @@ class _PalmListPageState extends State<PalmListPage> {
         palm['lastSeen'] ??
         palm['createdAt'];
 
-    if (raw == null) return 'Not available';
+    if (raw == null) {
+      return AuthStore.arabic.value ? 'غير متاح' : 'Not available';
+    }
 
     DateTime? date;
 
@@ -159,7 +161,9 @@ class _PalmListPageState extends State<PalmListPage> {
       date = DateTime.tryParse(raw.toString());
     }
 
-    if (date == null) return 'Not available';
+    if (date == null) {
+      return AuthStore.arabic.value ? 'غير متاح' : 'Not available';
+    }
 
     final local = date.toLocal();
 
@@ -183,7 +187,13 @@ class _PalmListPageState extends State<PalmListPage> {
     } catch (error) {
       if (!mounted) return;
 
-      showRasdError(context, error, title: 'Could not add the palm');
+      showRasdError(
+        context,
+        error,
+        title: AuthStore.arabic.value
+            ? 'تعذرت إضافة النخلة'
+            : 'Could not add the palm',
+      );
     }
   }
 
@@ -203,17 +213,20 @@ class _PalmListPageState extends State<PalmListPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Palms'),
+title: Text(isArabic ? 'النخيل' : 'Palms'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPalm,
         icon: const Icon(Icons.add),
-        label: const Text('Add Palm'),
+label: Text(isArabic ? 'إضافة نخلة' : 'Add Palm'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -229,7 +242,9 @@ class _PalmListPageState extends State<PalmListPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'Unable to load palms:\n${snapshot.error}',
+isArabic
+? 'تعذر تحميل النخيل:\n${snapshot.error}'
+: 'Unable to load palms:\n${snapshot.error}',
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -274,14 +289,15 @@ class _PalmListPageState extends State<PalmListPage> {
                     CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Palm List',
+isArabic ? 'قائمة النخيل' : 'Palm List',
                         style: Theme.of(context)
                             .textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${filtered.length} palms found '
-                            '(${allPalms.length} total)',
+isArabic
+? 'تم العثور على ${filtered.length} نخلة (الإجمالي ${allPalms.length})'
+: '${filtered.length} palms found (${allPalms.length} total)',
                         style: Theme.of(context)
                             .textTheme.bodyMedium
                             ?.copyWith(
@@ -293,7 +309,7 @@ class _PalmListPageState extends State<PalmListPage> {
                         controller: _searchController,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText: 'Search by Palm ID...',
+hintText: isArabic ? 'ابحث باستخدام معرّف النخلة...' : 'Search by Palm ID...',
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon:
                           _searchController.text.isNotEmpty
@@ -320,7 +336,17 @@ class _PalmListPageState extends State<PalmListPage> {
                                 right: 8,
                               ),
                               child: ChoiceChip(
-                                label: Text(filter),
+label: Text(
+isArabic
+? (filter == 'All'
+? 'الكل'
+: filter == 'Healthy'
+? 'سليمة'
+: filter == 'Suspected'
+? 'مشتبه بالإصابة'
+: 'تحت المراقبة')
+: filter,
+),
                                 selected: selected,
                                 showCheckmark: false,
                                 onSelected: (_) {
@@ -362,17 +388,21 @@ class _PalmListPageState extends State<PalmListPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          allPalms.isEmpty
-                              ? 'No palms added yet'
-                              : 'No palms found',
+allPalms.isEmpty
+? (isArabic ? 'لم تتم إضافة أي نخيل بعد' : 'No palms added yet')
+: (isArabic ? 'لم يتم العثور على نخيل' : 'No palms found'),
                           style: Theme.of(context)
                               .textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          allPalms.isEmpty
-                              ? 'Tap Add Palm to register your first palm.'
-                              : 'Try another search or status.',
+allPalms.isEmpty
+? (isArabic
+? 'اضغط على إضافة نخلة لتسجيل أول نخلة.'
+: 'Tap Add Palm to register your first palm.')
+: (isArabic
+? 'جرّب البحث أو اختيار حالة أخرى.'
+: 'Try another search or status.'),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -430,9 +460,17 @@ class _PalmListPageState extends State<PalmListPage> {
                                             .textTheme.titleMedium,
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        status,
-                                        style: TextStyle(
+Text(
+isArabic
+? (status == 'Healthy'
+? 'سليمة'
+: status == 'Suspected'
+? 'مشتبه بالإصابة'
+: status == 'Monitoring'
+? 'تحت المراقبة'
+: 'الكل')
+: status,
+style: TextStyle(
                                           color: color,
                                           fontWeight:
                                           FontWeight.w600,
@@ -440,8 +478,9 @@ class _PalmListPageState extends State<PalmListPage> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Last updated: '
-                                            '${_lastUpdated(palm)}',
+isArabic
+? 'آخر تحديث: ${_lastUpdated(palm)}'
+: 'Last updated: ${_lastUpdated(palm)}',
                                         style: Theme.of(context)
                                             .textTheme.bodySmall,
                                       ),
@@ -465,6 +504,8 @@ class _PalmListPageState extends State<PalmListPage> {
           },
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }

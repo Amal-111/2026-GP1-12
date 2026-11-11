@@ -11,7 +11,7 @@ import '../services/rasd_errors.dart';
 import 'auth_widgets.dart';
 import 'password_rules.dart';
 import 'login_page.dart';
-
+import '../data/auth_store.dart';
 /// Sign Up page.
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -96,11 +96,14 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Sign Up',
+        title: isArabic ? 'إنشاء حساب' : 'Sign Up',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () {
@@ -129,15 +132,15 @@ class _SignUpPageState extends State<SignUpPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppTextField(
-                          label: 'Full Name',
-                          hint: 'Enter your full name',
+                          label: isArabic ? 'الاسم الكامل' : 'Full Name',
+                          hint: isArabic ? 'أدخل اسمك الكامل' : 'Enter your full name',
                           icon: Icons.person_outline,
                           controller: _nameController,
                           validator: AuthValidators.name,
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Email',
+                          label: isArabic ? 'البريد الإلكتروني' : 'Email',
                           hint: 'name@example.com',
                           icon: Icons.mail_outline,
                           controller: _emailController,
@@ -146,7 +149,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Phone Number',
+                          label: isArabic ? 'رقم الجوال' : 'Phone Number',
                           hint: '05XXXXXXXX',
                           icon: Icons.phone_outlined,
                           controller: _phoneController,
@@ -155,8 +158,8 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Password',
-                          hint: 'Create a strong password',
+                          label: isArabic ? 'كلمة المرور' : 'Password',
+                          hint: isArabic ? 'أنشئ كلمة مرور قوية' : 'Create a strong password',
                           icon: Icons.lock_outline,
                           controller: _passwordController,
                           isPassword: true,
@@ -169,17 +172,19 @@ class _SignUpPageState extends State<SignUpPage> {
                         ],
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Confirm Password',
-                          hint: 'Re-enter your password',
+                          label: isArabic ? 'تأكيد كلمة المرور' : 'Confirm Password',
+                          hint: isArabic ? 'أعيد إدخال كلمة المرور' : 'Re-enter your password',
                           icon: Icons.lock_outline,
                           controller: _confirmController,
                           isPassword: true,
                           validator: (v) => !_awaitingVerification && v != _passwordController.text
-                              ? 'Passwords do not match. Type the same password again.'
+                              ? (isArabic
+                              ? 'كلمتا المرور غير متطابقتين. أدخل كلمة المرور نفسها مرة أخرى.'
+                              : 'Passwords do not match. Type the same password again.')
                               : null,
                         ),
                         const SizedBox(height: 14),
-                        const FieldLabel('I am a'),
+                        FieldLabel(isArabic ? 'أنا:' : 'I am a'),
                         Row(
                           children: [
                             Expanded(
@@ -188,8 +193,10 @@ class _SignUpPageState extends State<SignUpPage> {
                                   size: 30,
                                   color: AppColors.primary,
                                 ),
-                                title: 'Farm Owner',
-                                subtitle: 'Manage farms & farmers',
+                                title: isArabic ? 'مالك المزرعة' : 'Farm Owner',
+                                subtitle: isArabic
+                                    ? 'إدارة المزارع والمزارعين'
+                                    : 'Manage farms & farmers',
                                 selected: _role == UserRole.farmOwner,
                                 onTap: () => setState(
                                   () => _role = UserRole.farmOwner,
@@ -204,8 +211,8 @@ class _SignUpPageState extends State<SignUpPage> {
                                   size: 30,
                                   color: AppColors.primary,
                                 ),
-                                title: 'Farmer',
-                                subtitle: 'Monitor palms',
+                                title: isArabic ? 'مزارع' : 'Farmer',
+                                subtitle: isArabic ? 'مراقبة النخيل' : 'Monitor palms',
                                 selected: _role == UserRole.farmer,
                                 onTap: () => setState(
                                   () => _role = UserRole.farmer,
@@ -229,7 +236,13 @@ class _SignUpPageState extends State<SignUpPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _busy ? null : _createAccount,
-                      child: Text(_awaitingVerification ? 'I Verified My Email — Continue' : 'Create Account'),
+                      child: Text(
+                        _awaitingVerification
+                            ? (isArabic
+                            ? 'تحققت من بريدي — متابعة'
+                            : 'I Verified My Email — Continue')
+                            : (isArabic ? 'إنشاء حساب' : 'Create Account'),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -238,7 +251,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Already have an account? ',
+                          isArabic ? 'لديك حساب بالفعل؟ ' : 'Already have an account? ',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         GestureDetector(
@@ -251,7 +264,7 @@ class _SignUpPageState extends State<SignUpPage> {
                             );
                           },
                           child: Text(
-                            'Log In',
+                            isArabic ? 'تسجيل الدخول' : 'Log In',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
@@ -270,8 +283,10 @@ class _SignUpPageState extends State<SignUpPage> {
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 /// Selectable card for choosing a role.

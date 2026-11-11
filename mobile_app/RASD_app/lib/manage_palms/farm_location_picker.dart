@@ -6,7 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
 import '../map/map_tiles.dart';
-
+import '../data/auth_store.dart';
 /// Real map (from the internet) where the user taps to place the palm
 /// or the sensor.
 /// - Pinch / scroll to zoom, drag to move.
@@ -74,11 +74,14 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
     ));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final pin = _pin;
+@override
+Widget build(BuildContext context) {
+final pin = _pin;
 
-    return ClipRRect(
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
         height: 320,
@@ -105,7 +108,9 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
                         width: 18,
                         height: 18,
                         child: Tooltip(
-                          message: 'Palm #${p.id}',
+message: isArabic
+? 'النخلة رقم ${p.id}'
+: 'Palm #${p.id}',
                           child: Container(
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.9),
@@ -148,10 +153,14 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
                       color: Colors.white.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      pin == null
-                          ? 'Tap on the map to set the location'
-                          : 'Tap again to move the pin',
+child: Text(
+pin == null
+? (isArabic
+? 'اضغط على الخريطة لتحديد الموقع'
+: 'Tap on the map to set the location')
+: (isArabic
+? 'اضغط مرة أخرى لتحريك العلامة'
+: 'Tap again to move the pin'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontFamily: 'Cairo',
@@ -173,13 +182,15 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
                 children: [
                   _MapButton(
                     icon: _satellite ? Icons.map_outlined : Icons.satellite_alt,
-                    tooltip: _satellite ? 'Street map' : 'Satellite',
+tooltip: _satellite
+? (isArabic ? 'خريطة الشوارع' : 'Street map')
+: (isArabic ? 'الأقمار الصناعية' : 'Satellite'),
                     onTap: () => setState(() => _satellite = !_satellite),
                   ),
                   const SizedBox(height: 8),
                   _MapButton(
                     icon: Icons.add,
-                    tooltip: 'Zoom in',
+tooltip: isArabic ? 'تكبير' : 'Zoom in',
                     onTap: () => _mapController.move(
                       _mapController.camera.center,
                       _mapController.camera.zoom + 1,
@@ -188,7 +199,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
                   const SizedBox(height: 8),
                   _MapButton(
                     icon: Icons.remove,
-                    tooltip: 'Zoom out',
+tooltip: isArabic ? 'تصغير' : 'Zoom out',
                     onTap: () => _mapController.move(
                       _mapController.camera.center,
                       _mapController.camera.zoom - 1,
@@ -198,7 +209,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
                     const SizedBox(height: 8),
                     _MapButton(
                       icon: Icons.center_focus_strong,
-                      tooltip: 'Go to pin',
+tooltip: isArabic ? 'الانتقال إلى العلامة' : 'Go to pin',
                       onTap: () => _mapController.move(
                         pin,
                         _mapController.camera.zoom,
@@ -211,8 +222,10 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 /// Round button on the map.

@@ -3,16 +3,18 @@ import 'package:flutter/material.dart';
 import '../theme/glass_widgets.dart';
 import '../theme/app_colors.dart';
 import 'package:firebase_database/firebase_database.dart';
-
+import '../data/auth_store.dart';
 /// Shows the monitoring history of a palm.
 class MonitoringHistoryPage extends StatelessWidget {
   final String farmId;
   final String palmId;
+  final bool showAppBar;
 
   const MonitoringHistoryPage({
     super.key,
     required this.farmId,
     required this.palmId,
+    this.showAppBar = true,
   });
 
   List<Map<String, String>> _recordsFromData(Object? data) {
@@ -55,14 +57,21 @@ class MonitoringHistoryPage extends StatelessWidget {
     return result == 'Possible Pest Detected';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Monitoring History'),
-        centerTitle: true,
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+  return Scaffold(
+    appBar: showAppBar
+        ? AppBar(
+      title: Text(
+        isArabic ? 'سجل المراقبة' : 'Monitoring History',
       ),
-      body: SafeArea(
+      centerTitle: true,
+    )
+        : null,
+    body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -73,19 +82,25 @@ class MonitoringHistoryPage extends StatelessWidget {
                 20,
                 16,
               ),
+      child: SizedBox(
+        width: double.infinity,
               child: GlassLabel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Monitoring History - $palmId',
+isArabic
+? 'سجل المراقبة - $palmId'
+: 'Monitoring History - $palmId',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Previous monitoring records',
+isArabic
+? 'سجلات المراقبة السابقة'
+: 'Previous monitoring records',
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium
@@ -96,6 +111,7 @@ class MonitoringHistoryPage extends StatelessWidget {
                 ],
               ),
               ),
+      ),
             ),
 
             Expanded(
@@ -104,125 +120,139 @@ class MonitoringHistoryPage extends StatelessWidget {
                     .ref('monitoringHistory/$farmId/$palmId')
                     .onValue,
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: GlassLabel(child: Text('Unable to load monitoring history.')),
-                    );
-                  }
+if (snapshot.hasError) {
+return Center(
+child: GlassLabel(
+child: Text(
+isArabic
+? 'تعذر تحميل سجل المراقبة.'
+: 'Unable to load monitoring history.',
+),
+),
+);
+}
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   final records = _recordsFromData(snapshot.data!.snapshot.value);
-                  return records.isEmpty
-                      ? const Center(child: GlassLabel(child: Text('No monitoring events yet.')))
-                      : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  0,
-                  20,
-                  24,
+return records.isEmpty
+    ? Center(
+  child: GlassLabel(
+    child: Text(
+      isArabic
+          ? 'لا توجد سجلات مراقبة حتى الآن.'
+          : 'No monitoring events yet.',
+    ),
+  ),
+)
+    : ListView.separated(
+  padding: const EdgeInsets.fromLTRB(
+    20,
+    0,
+    20,
+    24,
+  ),
+  itemCount: records.length,
+  separatorBuilder: (_, __) => const SizedBox(height: 10),
+  itemBuilder: (context, index) {
+    final record = records[index];
+    final result = record['result']!;
+    final isDetected = _isPestDetected(result);
+
+    final resultColor = isDetected
+        ? AppColors.suspected
+        : AppColors.healthy;
+
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MonitoringRecordDetailsPage(
+                palmId: palmId,
+                date: record['date']!,
+                time: record['time']!,
+                result: result,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: resultColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                itemCount: records.length,
-                separatorBuilder: (_, __) =>
-                const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final record = records[index];
-                  final result = record['result']!;
-                  final isDetected = _isPestDetected(result);
-
-                  final resultColor = isDetected
-                      ? AppColors.suspected
-                      : AppColors.healthy;
-
-                  return GlassCard(
-                    margin: EdgeInsets.zero,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                MonitoringRecordDetailsPage(
-                                  palmId: palmId,
-                                  date: record['date']!,
-                                  time: record['time']!,
-                                  result: result,
-                                ),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: resultColor.withValues(
-                                  alpha: 0.12,
-                                ),
-                                borderRadius:
-                                BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                isDetected
-                                    ? Icons.warning_rounded
-                                    : Icons.check_circle_rounded,
-                                color: resultColor,
-                                size: 25,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${record['date']} • ${record['time']}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    result,
-                                    style: TextStyle(
-                                      fontFamily: 'Cairo',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: resultColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.textSecondary,
-                              size: 25,
-                            ),
-                          ],
-                        ),
+                child: Icon(
+                  isDetected
+                      ? Icons.warning_rounded
+                      : Icons.check_circle_rounded,
+                  color: resultColor,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${record['date']} • ${record['time']}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      isArabic
+                          ? (result == 'Possible Pest Detected'
+                          ? 'مشتبه بالإصابة'
+                          : result == 'Under Monitoring'
+                          ? 'تحت المراقبة'
+                          : result == 'Healthy'
+                          ? 'سليمة'
+                          : 'غير معروف')
+                          : result,
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: resultColor,
                       ),
                     ),
-                  );
-                },
-              );
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+                size: 25,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  },
+);
                 },
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 /// Details of one monitoring record.

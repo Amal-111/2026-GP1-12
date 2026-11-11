@@ -8,7 +8,7 @@ import 'add_palm_page.dart';
 import 'edit_palm_page.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_errors.dart';
-
+import '../data/auth_store.dart';
 /// Manage Palms: list of palms with Add, Edit and Delete.
 class ManagePalmsPage extends StatefulWidget {
   const ManagePalmsPage({super.key});
@@ -48,9 +48,11 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     if (_store.activeFarmId == null || _store.activeFarmId!.isEmpty) {
       showCenterMessage(
         context,
-        'Ask the farm owner to invite you to a farm before adding palms.',
+        AuthStore.arabic.value
+            ? 'اطلبي من مالك المزرعة دعوتك إلى مزرعة قبل إضافة النخيل.'
+            : 'Ask the farm owner to invite you to a farm before adding palms.',
         success: false,
-        title: 'No farm assigned',
+        title: AuthStore.arabic.value ? 'لا توجد مزرعة مرتبطة' : 'No farm assigned',
       );
       return;
     }
@@ -59,7 +61,11 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
       MaterialPageRoute(builder: (_) => const AddPalmPage()),
     );
     if (added == true && mounted) {
-      _showMessage('Palm tree added successfully.');
+      _showMessage(
+        AuthStore.arabic.value
+            ? 'تمت إضافة النخلة بنجاح.'
+            : 'Palm tree added successfully.',
+      );
     }
   }
 
@@ -70,7 +76,11 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
       MaterialPageRoute(builder: (_) => EditPalmPage(palm: palm)),
     );
     if (saved == true && mounted) {
-      _showMessage('Palm tree information updated successfully.');
+      _showMessage(
+        AuthStore.arabic.value
+            ? 'تم تحديث معلومات النخلة بنجاح.'
+            : 'Palm tree information updated successfully.',
+      );
     }
   }
 
@@ -79,20 +89,26 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete ${palm.id}?'),
-        content: const Text(
-          'Are you sure you want to delete this palm tree? '
-          'This action cannot be undone.',
+        title: Text(
+          AuthStore.arabic.value
+              ? 'حذف ${palm.id}؟'
+              : 'Delete ${palm.id}?',
+        ),
+        content: Text(
+          AuthStore.arabic.value
+              ? 'هل أنت متأكدة من حذف هذه النخلة؟ لا يمكن التراجع عن هذا الإجراء.'
+              : 'Are you sure you want to delete this palm tree? '
+              'This action cannot be undone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(AuthStore.arabic.value ? 'إلغاء' : 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(AuthStore.arabic.value ? 'حذف' : 'Delete'),
           ),
         ],
       ),
@@ -101,10 +117,22 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     if (confirmed == true) {
       try {
         await RasdManagementService.deletePalm(palm);
-        if (mounted) _showMessage('Palm tree deleted successfully.');
-      } catch (error) {
+if (mounted) {
+_showMessage(
+AuthStore.arabic.value
+? 'تم حذف النخلة بنجاح.'
+: 'Palm tree deleted successfully.',
+);
+}
+} catch (error) {
         if (mounted) {
-          showRasdError(context, error, title: 'Could not delete the palm');
+showRasdError(
+context,
+error,
+title: AuthStore.arabic.value
+? 'تعذر حذف النخلة'
+: 'Could not delete the palm',
+);
         }
       }
     }
@@ -140,11 +168,28 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+String _translateStatus(String status) {
+switch (status) {
+case 'Healthy':
+return 'سليمة';
+case 'Suspected':
+return 'مشتبه بالإصابة';
+case 'Under Monitoring':
+return 'تحت المراقبة';
+case 'Treated':
+return 'تم علاجها';
+default:
+return status;
+}
+}
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Manage Palms',
+title: isArabic ? 'إدارة النخيل' : 'Manage Palms',
       ),
       body: SafeArea(
         child: StreamBuilder<List<Palm>>(
@@ -160,10 +205,10 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by Palm ID...',
-                      prefixIcon: Icon(Icons.search),
-                    ),
+decoration: InputDecoration(
+hintText: isArabic ? 'ابحثي برقم النخلة...' : 'Search by Palm ID...',
+prefixIcon: const Icon(Icons.search),
+),
                   ),
                 ),
                 Expanded(
@@ -171,7 +216,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                       ? Center(
                           child: GlassBox(
                             child: Text(
-                              'No palms found',
+isArabic ? 'لم يتم العثور على نخيل' : 'No palms found',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
@@ -193,7 +238,7 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                     child: ElevatedButton.icon(
                       onPressed: _openAddPalm,
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Palm'),
+label: Text(isArabic ? 'إضافة نخلة' : 'Add Palm'),
                     ),
                   ),
                 ),
@@ -201,9 +246,11 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
             );
           },
         ),
-      ),
-    );
-  }
+),
+);
+},
+);
+}
 
   /// Builds one palm row.
   Widget _buildPalmCard(Palm palm) {
@@ -230,7 +277,9 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                   Text(palm.id,
                       style: Theme.of(context).textTheme.titleMedium),
                   Text(
-                    palm.statusLabel,
+AuthStore.arabic.value
+? _translateStatus(palm.statusLabel)
+: palm.statusLabel,
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 14,
@@ -238,10 +287,12 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
                       color: color,
                     ),
                   ),
-                  Text(
-                    '${palm.type ?? '-'} · ${palm.age == null ? '-' : '${palm.age} yrs'} · ${palm.deviceId.isEmpty ? 'No device' : palm.deviceId}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+Text(
+'${palm.type ?? '-'} · '
+'${palm.age == null ? '-' : '${palm.age} ${AuthStore.arabic.value ? 'سنة' : 'yrs'}'} · '
+'${palm.deviceId.isEmpty ? (AuthStore.arabic.value ? 'لا يوجد مستشعر' : 'No device') : palm.deviceId}',
+style: Theme.of(context).textTheme.bodySmall,
+),
                 ],
               ),
             ),
@@ -249,13 +300,13 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
               onPressed: () => _openEditPalm(palm),
               icon: const Icon(Icons.edit_outlined),
               color: AppColors.primary,
-              tooltip: 'Edit',
+tooltip: AuthStore.arabic.value ? 'تعديل' : 'Edit',
             ),
             IconButton(
               onPressed: () => _confirmDelete(palm),
               icon: const Icon(Icons.delete_outline),
               color: AppColors.error,
-              tooltip: 'Delete',
+tooltip: AuthStore.arabic.value ? 'حذف' : 'Delete',
             ),
           ],
         ),

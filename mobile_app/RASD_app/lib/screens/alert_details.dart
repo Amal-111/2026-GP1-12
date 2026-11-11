@@ -8,7 +8,7 @@ import '../theme/app_colors.dart';
 import 'alerts.dart';
 import '../list/palm_details.dart';
 import '../map/palm_map.dart';
-
+import '../data/auth_store.dart';
 /// Alert details page.
 class AlertDetailsScreen extends StatefulWidget {
   final RasdAlert alert;
@@ -20,20 +20,32 @@ class AlertDetailsScreen extends StatefulWidget {
 }
 
 class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
-  @override
-  Widget build(BuildContext context) {
-    final alert = widget.alert;
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+final alert = widget.alert;
     final color = alertTypeColor(alert.type);
 
-    String recommendation = 'Please inspect this palm tree and look for signs of infestation.';
-    if (alert.type == 'UnderMonitoring') {
-      recommendation = 'Continue monitoring this palm and follow the treatment schedule.';
-    } else if (alert.type == 'SensorOffline') {
-      recommendation = 'Check the device power and connection, then verify data transmission.';
-    }
+String recommendation = isArabic
+? 'يرجى فحص هذه النخلة والبحث عن علامات الإصابة.'
+: 'Please inspect this palm tree and look for signs of infestation.';
+
+if (alert.type == 'UnderMonitoring') {
+recommendation = isArabic
+? 'استمر في مراقبة هذه النخلة واتبع جدول العلاج.'
+: 'Continue monitoring this palm and follow the treatment schedule.';
+} else if (alert.type == 'SensorOffline') {
+recommendation = isArabic
+? 'تحقق من طاقة الجهاز واتصاله، ثم تأكد من إرسال البيانات.'
+: 'Check the device power and connection, then verify data transmission.';
+}
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Alert Details')),
+appBar: AppBar(
+title: Text(isArabic ? 'تفاصيل التنبيه' : 'Alert Details'),
+),
       body: StreamBuilder<DatabaseEvent>(
         stream: FirebaseDatabase.instance.ref('palms/${alert.farmId}/${alert.palmId}').onValue,
         builder: (context, snapshot) {
@@ -57,7 +69,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                         Text(alert.palmId),
                         Text(
                           alert.createdAt == null
-                              ? 'Date unavailable'
+? (isArabic ? 'التاريخ غير متاح' : 'Date unavailable')
                               : '${alert.createdAt!.toLocal().day}/${alert.createdAt!.toLocal().month}/${alert.createdAt!.toLocal().year}'
                                 '  •  '
                                 '${alert.createdAt!.toLocal().hour.toString().padLeft(2, '0')}:'
@@ -100,14 +112,16 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Find this palm on the farm map',
+Text(
+isArabic
+? 'اعثر على هذه النخلة في خريطة المزرعة'
+: 'Find this palm on the farm map',
                             style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
                           ),
                           const SizedBox(height: 8),
                           TextButton.icon(
                             icon: const Icon(Icons.map_outlined),
-                            label: const Text('View on Map'),
+label: Text(isArabic ? 'عرض على الخريطة' : 'View on Map'),
                             onPressed: !hasPalmReference ? null : () {
                               Navigator.push(
                                 context,
@@ -122,7 +136,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                           ),
                           TextButton.icon(
                             icon: const PalmIcon(),
-                            label: const Text('Palm Details'),
+label: Text(isArabic ? 'تفاصيل النخلة' : 'Palm Details'),
                             onPressed: !hasPalmReference
                                 ? null
                                 : () {
@@ -153,7 +167,10 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Recommended Action', style: TextStyle(fontWeight: FontWeight.bold)),
+Text(
+isArabic ? 'الإجراء الموصى به' : 'Recommended Action',
+style: const TextStyle(fontWeight: FontWeight.bold),
+),
                         const SizedBox(height: 6),
                         Text(recommendation),
                       ],
@@ -167,7 +184,13 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Alert Message', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+Text(
+isArabic ? 'رسالة التنبيه' : 'Alert Message',
+style: const TextStyle(
+fontWeight: FontWeight.bold,
+fontSize: 17,
+),
+),
                   const SizedBox(height: 5),
                   Text(alert.message),
                 ],
@@ -179,5 +202,7 @@ class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
         },
       ),
     );
-  }
+},
+);
+}
 }

@@ -44,17 +44,23 @@ class _ProfilePageState extends State<ProfilePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text('You will need to log in again to use RASD.'),
+        title: Text(
+          AuthStore.arabic.value ? 'تسجيل الخروج؟' : 'Log out?',
+        ),
+        content: Text(
+          AuthStore.arabic.value
+              ? 'ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام رصد.'
+              : 'You will need to log in again to use RASD.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(AuthStore.arabic.value ? 'إلغاء' : 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Log Out'),
+            child: Text(AuthStore.arabic.value ? 'تسجيل الخروج' : 'Log Out'),
           ),
         ],
       ),
@@ -71,14 +77,17 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isFarmer = AuthStore.role == UserRole.farmer;
-    final farmLabel = AuthStore.farmName ?? 'No farm assigned';
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+final isFarmer = AuthStore.role == UserRole.farmer;
+final farmLabel = AuthStore.farmName ?? 'No farm assigned';
 
-    return PalmScaffold(
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Profile',
+title: isArabic ? 'الملف الشخصي' : 'Profile',
         leading: widget.showBackButton
             ? null
             : const SizedBox.shrink(),
@@ -127,21 +136,27 @@ class _ProfilePageState extends State<ProfilePage> {
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              _Chip(
-                                isFarmer ? 'Farmer' : 'Farm Owner',
-                                filled: true,
-                              ),
+_Chip(
+isArabic
+? (isFarmer ? 'مزارع' : 'مالك المزرعة')
+: (isFarmer ? 'Farmer' : 'Farm Owner'),
+filled: true,
+),
                               if (isFarmer)
                                 FutureBuilder<String>(
                                   future: RasdAuthService.getMyAssignedFarmName(),
                                   builder: (context, snapshot) {
-                                    if (snapshot.hasError) {
-                                      return const _Chip('Unable to load farm');
-                                    }
+if (snapshot.hasError) {
+return _Chip(
+isArabic ? 'تعذر تحميل المزرعة' : 'Unable to load farm',
+);
+}
 
-                                    if (!snapshot.hasData) {
-                                      return const _Chip('Loading...');
-                                    }
+if (!snapshot.hasData) {
+return _Chip(
+isArabic ? 'جارٍ التحميل...' : 'Loading...',
+);
+}
 
                                     return _Chip(snapshot.data!);
                                   },
@@ -151,19 +166,23 @@ class _ProfilePageState extends State<ProfilePage> {
                                 StreamBuilder<List<FarmRecord>>(
                                   stream: RasdFarmsService.watchMyFarms(),
                                   builder: (context, snapshot) {
-                                    if (snapshot.hasError) {
-                                      return const _Chip('Unavailable');
-                                    }
+if (snapshot.hasError) {
+return _Chip(
+isArabic ? 'غير متاح' : 'Unavailable',
+);
+}
 
-                                    if (!snapshot.hasData) {
-                                      return const _Chip('...');
-                                    }
+if (!snapshot.hasData) {
+return const _Chip('...');
+}
 
-                                    final count = snapshot.data!.length;
+final count = snapshot.data!.length;
 
-                                    return _Chip(
-                                      '$count ${count == 1 ? 'Farm' : 'Farms'}',
-                                    );
+return _Chip(
+isArabic
+? '$count ${count == 1 ? 'مزرعة' : 'مزارع'}'
+: '$count ${count == 1 ? 'Farm' : 'Farms'}',
+);
                                   },
                                 ),
                             ],
@@ -182,37 +201,41 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SectionLabel('Account'),
+_SectionLabel(isArabic ? 'الحساب' : 'Account'),
                     _MenuRow(
                       icon: Icons.edit_outlined,
-                      label: 'Edit Profile',
+label: isArabic ? 'تعديل الملف الشخصي' : 'Edit Profile',
                       trailing: const _Chevron(),
                       onTap: () => _open(
                         const EditProfilePage(),
-                        'Profile updated successfully.',
+isArabic
+? 'تم تحديث الملف الشخصي بنجاح.'
+: 'Profile updated successfully.',
                       ),
                     ),
                     const _RowDivider(),
                     _MenuRow(
                       icon: Icons.lock_outline,
-                      label: 'Change Password',
+label: isArabic ? 'تغيير كلمة المرور' : 'Change Password',
                       trailing: const _Chevron(),
                       onTap: () => _open(
                         const ChangePasswordPage(),
-                        'Password updated successfully.',
+isArabic
+? 'تم تحديث كلمة المرور بنجاح.'
+: 'Password updated successfully.',
                       ),
                     ),
 
-                    const _SectionLabel('Settings'),
+_SectionLabel(isArabic ? 'الإعدادات' : 'Settings'),
                     _MenuRow(
                       icon: Icons.language,
-                      label: 'Language',
+label: isArabic ? 'اللغة' : 'Language',
                       trailing: const _LanguagePills(),
                     ),
                     const _RowDivider(),
                     _MenuRow(
                       icon: Icons.notifications_outlined,
-                      label: 'Notifications',
+label: isArabic ? 'الإشعارات' : 'Notifications',
                       trailing: ValueListenableBuilder<bool>(
                         valueListenable: AuthStore.notificationsOn,
                         builder: (context, on, _) => Switch(
@@ -225,10 +248,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
 
-                    const _SectionLabel('Help'),
+_SectionLabel(isArabic ? 'المساعدة' : 'Help'),
                     _MenuRow(
                       icon: Icons.menu_book_outlined,
-                      label: 'Guidance',
+label: isArabic ? 'الإرشادات' : 'Guidance',
                       trailing: const _Chevron(),
                       onTap: () {
                         Navigator.push(
@@ -250,7 +273,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: OutlinedButton.icon(
                   onPressed: _confirmLogOut,
                   icon: const Icon(Icons.logout),
-                  label: const Text('Log Out'),
+label: Text(
+isArabic ? 'تسجيل الخروج' : 'Log Out',
+),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.error,
                     side: const BorderSide(color: AppColors.error),
@@ -261,8 +286,10 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 /// Small label chip.

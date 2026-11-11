@@ -5,7 +5,7 @@ import '../theme/glass_widgets.dart';
 import '../services/rasd_alert_service.dart';
 import '../theme/app_colors.dart';
 import 'alert_details.dart';
-
+import '../data/auth_store.dart';
 /// Alerts page.
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key, required this.farmId});
@@ -18,27 +18,49 @@ class AlertsScreen extends StatefulWidget {
 
 class _AlertsScreenState extends State<AlertsScreen> {
   /// Turns a date into text like "5 min ago".
-  String _timeAgo(DateTime? date) {
-    if (date == null) return 'Date unavailable';
+  String _timeAgo(DateTime? date, bool isArabic) {
+    if (date == null) {
+      return isArabic ? 'التاريخ غير متاح' : 'Date unavailable';
+    }
+
     final d = DateTime.now().difference(date.toLocal());
-    if (d.isNegative || d.inMinutes < 1) return 'Just now';
-    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
-    if (d.inHours < 24) return '${d.inHours} hours ago';
-    return '${d.inDays} days ago';
+
+    if (d.isNegative || d.inMinutes < 1) {
+      return isArabic ? 'الآن' : 'Just now';
+    }
+
+    if (d.inMinutes < 60) {
+      return isArabic
+          ? 'قبل ${d.inMinutes} دقيقة'
+          : '${d.inMinutes} min ago';
+    }
+
+    if (d.inHours < 24) {
+      return isArabic
+          ? 'قبل ${d.inHours} ساعة'
+          : '${d.inHours} hours ago';
+    }
+
+    return isArabic
+        ? 'قبل ${d.inDays} يوم'
+        : '${d.inDays} days ago';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return SafeArea(
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: GlassLabel(
-                child: Text(
-                  'Alerts',
+Padding(
+padding: const EdgeInsets.all(16),
+child: Align(
+alignment: Alignment.centerLeft,
+child: GlassLabel(
+child: Text(
+isArabic ? 'التنبيهات' : 'Alerts',
                   style: TextStyle(
                     fontSize: 25,
                     fontWeight: FontWeight.bold,
@@ -55,18 +77,30 @@ class _AlertsScreenState extends State<AlertsScreen> {
               stream: RasdAlertService.watchAlerts(widget.farmId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const Center(child: GlassLabel(child: Text('Unable to load alerts.')));
+return Center(
+child: GlassLabel(
+child: Text(
+isArabic
+? 'تعذر تحميل التنبيهات.'
+: 'Unable to load alerts.',
+),
+),
+);
                 }
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final alerts = snapshot.data!;
-                return alerts.isEmpty
-                    ? const Center(
-                  child: GlassLabel(
-                    child: Text('No current alerts.'),
-                  ),
-                )
+return alerts.isEmpty
+? Center(
+child: GlassLabel(
+child: Text(
+isArabic
+? 'لا توجد تنبيهات حاليًا.'
+: 'No current alerts.',
+),
+),
+)
                     : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: alerts.length,
@@ -110,7 +144,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                               ),
                             ),
                             Text(
-                              _timeAgo(alert.createdAt),
+_timeAgo(alert.createdAt, isArabic),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -139,8 +173,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
           ),
         ],
       ),
-    );
-  }
+);
+},
+);
+}
 }
 
 Color alertTypeColor(String type) {

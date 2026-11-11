@@ -8,7 +8,7 @@ import '../theme/glass_widgets.dart';
 import '../theme/palm_icon.dart';
 import 'auth_widgets.dart';
 import 'sign_up_page.dart';
- 
+import '../data/auth_store.dart';
 /// Log In page.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -40,17 +40,29 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       openAppAfterAuth(context);
     } catch (error) {
-      if (mounted) showRasdError(context, error, title: 'Could not log in');
+      if (mounted) {
+        showRasdError(
+          context,
+          error,
+          title: AuthStore.arabic.value
+              ? 'تعذر تسجيل الدخول'
+              : 'Could not log in',
+        );
+      }
+
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
- 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Log In',
+title: isArabic ? 'تسجيل الدخول' : 'Log In',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
@@ -90,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Welcome back',
+isArabic ? 'مرحبًا بعودتك' : 'Welcome back',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleSmall
@@ -106,8 +118,8 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           children: [
                             AppTextField(
-                              label: 'Email',
-                              hint: 'name@example.com',
+label: isArabic ? 'البريد الإلكتروني' : 'Email',
+hint: 'name@example.com',
                               icon: Icons.mail_outline,
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
@@ -115,8 +127,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 14),
                             AppTextField(
-                              label: 'Password',
-                              hint: 'Enter your password',
+label: isArabic ? 'كلمة المرور' : 'Password',
+hint: isArabic ? 'أدخل كلمة المرور' : 'Enter your password',
                               icon: Icons.lock_outline,
                               controller: _passwordController,
                               isPassword: true,
@@ -141,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _busy ? null : _logIn,
-                      child: const Text('Log In'),
+child: Text(isArabic ? 'تسجيل الدخول' : 'Log In'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -150,7 +162,9 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "Don't have an account? ",
+isArabic
+? 'ليس لديك حساب؟ '
+: "Don't have an account? ",
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         GestureDetector(
@@ -163,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                           child: Text(
-                            'Sign Up',
+isArabic ? 'إنشاء حساب' : 'Sign Up',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
@@ -182,7 +196,9 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }
  

@@ -7,7 +7,7 @@ import '../theme/palm_icon.dart';
 import 'auth_widgets.dart';
 import 'login_page.dart';
 import 'sign_up_page.dart';
-
+import '../data/auth_store.dart';
 /// First page of the app: logo, Sign Up, Log In and the language switch.
 /// Put the logo image at assets/images/rasd_logo.png.
 class WelcomePage extends StatelessWidget {
@@ -15,7 +15,10 @@ class WelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+final height = MediaQuery.of(context).size.height;
 
     return PalmScaffold(
       body: Stack(
@@ -84,7 +87,9 @@ class WelcomePage extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Healthy Palms, Stronger Farms',
+                      isArabic
+                          ? 'نخيل صحي، مزارع أقوى'
+                          : 'Healthy Palms, Stronger Farms',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
@@ -101,7 +106,7 @@ class WelcomePage extends StatelessWidget {
                               builder: (_) => const SignUpPage()),
                         );
                       },
-                      child: const Text('Sign Up'),
+                      child: Text(isArabic ? 'إنشاء حساب' : 'Sign Up'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -114,7 +119,7 @@ class WelcomePage extends StatelessWidget {
                           MaterialPageRoute(builder: (_) => const LoginPage()),
                         );
                       },
-                      child: const Text('Log In'),
+                      child: Text(isArabic ? 'تسجيل الدخول' : 'Log In'),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -126,5 +131,7 @@ class WelcomePage extends StatelessWidget {
         ],
       ),
     );
+},
+);
   }
 }

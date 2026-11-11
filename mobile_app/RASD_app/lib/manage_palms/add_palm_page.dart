@@ -6,7 +6,7 @@ import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 import 'farm_location_picker.dart';
 import 'connect_sensor_page.dart';
-
+import '../data/auth_store.dart';
 /// Add New Palm: step 1 (palm information) and step 2 (location).
 /// Step 3 (connect sensor) is on ConnectSensorPage.
 /// The palm is only saved after the sensor is connected.
@@ -84,16 +84,36 @@ class _AddPalmPageState extends State<AddPalmPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
+  String _translatePalmType(String type, bool isArabic) {
+    if (!isArabic) return type;
+
+    switch (type) {
+      case 'Sukkari':
+        return 'سكري';
+      case 'Khalas':
+        return 'خلاص';
+      case 'Ajwa':
+        return 'عجوة';
+      case 'Barhi':
+        return 'برحي';
+      default:
+        return type;
+    }
+  }
+
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PopScope(
       canPop: _step == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) setState(() => _step = 0);
       },
       child: PalmScaffold(
         appBar: glassAppBar(
-          title: 'Add New Palm',
+title: isArabic ? 'إضافة نخلة جديدة' : 'Add New Palm',
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: _back,
@@ -111,9 +131,9 @@ class _AddPalmPageState extends State<AddPalmPage> {
                       GlassBox(child: PalmStepHeader(currentStep: _step)),
                       const SizedBox(height: 16),
                       GlassBox(
-                        child: _step == 0
-                            ? _buildInfoStep()
-                            : _buildLocationStep(),
+child: _step == 0
+? _buildInfoStep(isArabic)
+: _buildLocationStep(isArabic),
                       ),
                     ],
                   ),
@@ -125,50 +145,65 @@ class _AddPalmPageState extends State<AddPalmPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _next,
-                    child: Text(_step == 0 ? 'Next' : 'Next: Connect Sensor'),
+child: Text(
+_step == 0
+? (isArabic ? 'التالي' : 'Next')
+: (isArabic ? 'التالي: ربط المستشعر' : 'Next: Connect Sensor'),
+),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+),
+),
+);
+},
+);
+}
 
   /// Step 1: palm information fields.
-  Widget _buildInfoStep() {
+Widget _buildInfoStep(bool isArabic) {
     return Form(
       key: _infoFormKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _FieldLabel('Palm ID'),
+_FieldLabel(isArabic ? 'معرّف النخلة' : 'Palm ID'),
           // Given by the system, cannot be changed here.
           TextFormField(
-            initialValue: 'Assigned on save',
+initialValue: isArabic ? 'يُحدد عند الحفظ' : 'Assigned on save',
             readOnly: true,
             enabled: false,
-            decoration: const InputDecoration(
-              helperText: 'Final ID assigned automatically when saved',
-              prefixIcon: Icon(Icons.tag),
-            ),
+decoration: InputDecoration(
+helperText: isArabic
+? 'يتم تعيين المعرّف النهائي تلقائيًا عند الحفظ'
+: 'Final ID assigned automatically when saved',
+prefixIcon: const Icon(Icons.tag),
+),
           ),
           const SizedBox(height: 18),
-          const _FieldLabel('Age (years)'),
+_FieldLabel(isArabic ? 'العمر (بالسنوات)' : 'Age (years)'),
           TextFormField(
             controller: _ageController,
             autovalidateMode: AutovalidateMode.onUserInteraction,
             validator: PalmValidators.age,
-            decoration: const InputDecoration(hintText: 'e.g. 10'),
+decoration: InputDecoration(
+hintText: isArabic ? 'مثال: 10' : 'e.g. 10',
+),
           ),
           const SizedBox(height: 18),
-          const _FieldLabel('Type'),
+_FieldLabel(isArabic ? 'النوع' : 'Type'),
           DropdownButtonFormField<String>(
             initialValue: _type,
-            hint: const Text('Select palm type'),
+hint: Text(
+isArabic ? 'اختر نوع النخلة' : 'Select palm type',
+),
             items: PalmStore.palmTypes
-                .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                .map((t) => DropdownMenuItem(
+              value: t,
+              child: Text(_translatePalmType(t, isArabic)),
+            ))
                 .toList(),
             onChanged: (value) => setState(() => _type = value),
             validator: PalmValidators.required,
@@ -179,7 +214,7 @@ class _AddPalmPageState extends State<AddPalmPage> {
   }
 
   /// Step 2: choose the palm location.
-  Widget _buildLocationStep() {
+Widget _buildLocationStep(bool isArabic) {
     return Form(
       key: _locationFormKey,
       child: Column(
@@ -197,7 +232,9 @@ class _AddPalmPageState extends State<AddPalmPage> {
           OutlinedButton.icon(
             onPressed: _useCurrentLocation,
             icon: const Icon(Icons.my_location_rounded),
-            label: const Text('Use Current Location'),
+label: Text(
+isArabic ? 'استخدم موقعي الحالي' : 'Use Current Location',
+),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
             ),
@@ -212,14 +249,15 @@ class _AddPalmPageState extends State<AddPalmPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('Latitude'),
+_FieldLabel(isArabic ? 'خط العرض' : 'Latitude'),
                     TextFormField(
                       controller: _latController,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: PalmValidators.latitude,
                       onChanged: (_) => setState(() {}),
-                      decoration:
-                          const InputDecoration(hintText: 'e.g. 24.7136'),
+decoration: InputDecoration(
+hintText: isArabic ? 'مثال: 24.7136' : 'e.g. 24.7136',
+),
                     ),
                   ],
                 ),
@@ -229,14 +267,15 @@ class _AddPalmPageState extends State<AddPalmPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('Longitude'),
+_FieldLabel(isArabic ? 'خط الطول' : 'Longitude'),
                     TextFormField(
                       controller: _lngController,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: PalmValidators.longitude,
                       onChanged: (_) => setState(() {}),
-                      decoration:
-                          const InputDecoration(hintText: 'e.g. 46.6753'),
+decoration: InputDecoration(
+hintText: isArabic ? 'مثال: 46.6753' : 'e.g. 46.6753',
+),
                     ),
                   ],
                 ),
@@ -244,10 +283,12 @@ class _AddPalmPageState extends State<AddPalmPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'This will save the location of the palm tree.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+Text(
+isArabic
+? 'سيتم حفظ موقع النخلة.'
+: 'This will save the location of the palm tree.',
+style: Theme.of(context).textTheme.bodySmall,
+),
         ],
       ),
     );
@@ -268,8 +309,15 @@ class PalmStepHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titles = AuthStore.arabic.value
+        ? [
+      'أدخل معلومات النخلة',
+      'حدد الموقع',
+      'اربط المستشعر',
+    ]
+        : _titles;
     return Column(
-      children: List.generate(_titles.length, (i) {
+      children: List.generate(titles.length, (i) {
         final active = i <= currentStep;
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -294,7 +342,7 @@ class PalmStepHeader extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Text(
-                _titles[i],
+titles[i],
                 style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: 15,

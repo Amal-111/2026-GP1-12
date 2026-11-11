@@ -18,7 +18,7 @@ import '../services/selected_farm_service.dart';
 import 'alerts.dart';
 import '../farm_assignment/no_farm_assigned.dart';
 import '../services/rasd_errors.dart';
-
+import '../data/auth_store.dart';
 /// Home page.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -198,7 +198,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final user = _asMap(userSnapshot.data!.snapshot.value);
 
         if (user.isEmpty) {
-          return _errorPage('We could not find your profile. Log out and log in again.');
+          return _errorPage(
+            AuthStore.arabic.value
+                ? 'لم نتمكن من العثور على ملفك الشخصي. سجّل الخروج ثم سجّل الدخول مرة أخرى.'
+                : 'We could not find your profile. Log out and log in again.',
+          );
         }
 
         final role = _text(user['role']);
@@ -206,7 +210,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final isOwner = role == 'FarmOwner';
 
         if (!isFarmer && !isOwner) {
-          return _errorPage('This account type is not supported.');
+          return _errorPage(
+            AuthStore.arabic.value
+                ? 'نوع الحساب هذا غير مدعوم.'
+                : 'This account type is not supported.',
+          );
         }
 
         _isOwner = isOwner;
@@ -231,9 +239,13 @@ class _HomeScreenState extends State<HomeScreen> {
             final farmId = selectedFarmId ?? '';
 
             if (farmId.isEmpty) {
-              return const Scaffold(
+              return  Scaffold(
                 body: Center(
-                  child: Text('Choose a farm first.'),
+                  child: Text(
+                    AuthStore.arabic.value
+                        ? 'يرجى اختيار مزرعة أولاً.'
+                        : 'Choose a farm first.',
+                  ),
                 ),
               );
             }
@@ -266,11 +278,19 @@ class _HomeScreenState extends State<HomeScreen> {
         final farm = _asMap(farmSnapshot.data!.snapshot.value);
 
         if (farm.isEmpty || farm['deleting'] == true) {
-          return _errorPage('This farm is not available right now.');
+          return _errorPage(
+            AuthStore.arabic.value
+                ? 'هذه المزرعة غير متاحة حاليًا.'
+                : 'This farm is not available right now.',
+          );
         }
 
         if (ownerId != null && farm['ownerId'] != ownerId) {
-          return _errorPage('This farm belongs to another owner.');
+          return _errorPage(
+            AuthStore.arabic.value
+                ? 'هذه المزرعة تتبع مالكًا آخر.'
+                : 'This farm belongs to another owner.',
+          );
         }
 
         _farmId = farmId;
@@ -369,45 +389,51 @@ class _HomeScreenState extends State<HomeScreen> {
         );
     }
 
-    return Scaffold(
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return Scaffold(
       body: currentPage,
       bottomNavigationBar: NavigationBar(
         height: 78,
         selectedIndex: selectedTab,
         onDestinationSelected: _selectTab,
-        destinations: const [
+        destinations:  [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            label: isArabic ? 'الرئيسية' : 'Home',
           ),
           NavigationDestination(
             icon: PalmIcon(),
             selectedIcon: PalmIcon(),
-            label: 'Palms',
+            label: isArabic ? 'النخيل' : 'Palms',
           ),
           NavigationDestination(
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map),
-            label: 'Map',
+            label: isArabic ? 'الخريطة' : 'Map',
           ),
           NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
+            label: isArabic ? 'التنبيهات' : 'Alerts',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
-            label: 'Profile',
+            label: isArabic ? 'الملف الشخصي' : 'Profile',
           ),
         ],
       ),
-    );
+);
+},
+);
   }
 
   /// Builds the Home tab content.
   Widget _homePage() {
+    final isArabic = AuthStore.arabic.value;
     final offlinePalms =
     _palms.where((palm) => _isOffline(palm)).toList();
 
@@ -466,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       Expanded(
                         child: Text(
-                          'Hello, $_userName!',
+                          isArabic ? 'مرحبًا، $_userName!' : 'Hello, $_userName!',
                           style: const TextStyle(
                             fontSize: 27,
                             fontWeight: FontWeight.bold,
@@ -489,9 +515,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Welcome back to RASD.',
-                    style: TextStyle(
+                  Text(
+                    isArabic ? 'أهلًا بعودتك إلى رصد.' : 'Welcome back to RASD.',
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -531,10 +557,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Total Palms',
-                      style: TextStyle(
+                      isArabic ? 'إجمالي النخيل' : 'Total Palms',
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
@@ -563,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icons.park,
                     AppColors.healthy,
                     const Color(0xFFE8F7EE),
-                    'Healthy',
+                    isArabic ? 'سليم' : 'Healthy',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -573,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icons.warning_rounded,
                     AppColors.suspected,
                     const Color(0xFFFDECEC),
-                    'Suspected',
+                    isArabic ? 'مشتبه بالأصابه' : 'Suspected',
                   ),
                 ),
               ],
@@ -589,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icons.access_time_filled,
                     AppColors.monitoring,
                     const Color(0xFFFFF4DF),
-                    'Under Monitoring',
+                    isArabic ? 'تحت المراقبة' : 'Under Monitoring',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -630,8 +656,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: AppColors.offline,
                                       ),
                                     ),
-                                    const Text(
-                                      'Offline Sensors',
+                                    Text(
+                                      isArabic ? 'حساسات غير متصلة' : 'Offline Sensors',
                                       maxLines: 2,
                                       style: TextStyle(
                                         fontSize: 12,
@@ -656,8 +682,12 @@ class _HomeScreenState extends State<HomeScreen> {
             GlassLabel(
               child: Text(
                 latestPalmUpdate == null
-                    ? 'Last updated: No readings available'
-                    : 'Last updated: ${_formatDate(latestPalmUpdate)}',
+                    ? (isArabic
+                    ? 'آخر تحديث: لا توجد قراءات'
+                    : 'Last updated: No readings available')
+                    : (isArabic
+                    ? 'آخر تحديث: ${_formatDate(latestPalmUpdate)}'
+                    : 'Last updated: ${_formatDate(latestPalmUpdate)}'),
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -671,10 +701,10 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Recent Alerts',
-                      style: TextStyle(
+                      isArabic ? 'أحدث التنبيهات' : 'Recent Alerts',
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -682,20 +712,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   TextButton(
                     onPressed: _openAlerts,
-                    child: const Text('View All ›'),
+                    child: Text(isArabic ? 'عرض الكل ›' : 'View All ›'),
                   ),
                 ],
               ),
             ),
 
             if (recentAlerts.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Center(
                   child: GlassLabel(
                     child: Text(
-                      'No recent alerts.',
-                      style: TextStyle(
+                      isArabic ? 'لا توجد تنبيهات حديثة.' : 'No recent alerts.',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
@@ -777,11 +807,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Builds one alert card.
   Widget _alertCard(Map<String, dynamic> alert) {
     final alertType = _text(alert['alertType']);
+    final isArabic = AuthStore.arabic.value;
+
     final title = alertType == 'SensorOffline'
-        ? 'Sensor Offline'
+        ? (isArabic ? 'الحساس غير متصل' : 'Sensor Offline')
         : alertType == 'PossiblePestDetected'
-        ? 'Potential Infestation'
-        : 'Farm Alert';
+        ? (isArabic ? 'اشتباه بإصابة' : 'Potential Infestation')
+        : (isArabic ? 'تنبيه المزرعة' : 'Farm Alert');
 
     final palmId = _text(alert['palmId']);
 
@@ -822,7 +854,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     CrossAxisAlignment.start,
                     children: [
                       Text(
-                        palmId.isEmpty ? 'Farm' : palmId,
+                        palmId.isEmpty ? (isArabic ? 'المزرعة' : 'Farm') : palmId,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -875,8 +907,10 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Offline Sensors',
+                 Text(
+                  AuthStore.arabic.value
+                      ? 'الحساسات غير المتصلة'
+                      : 'Offline Sensors',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -885,8 +919,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 if (offlinePalms.isEmpty)
-                  const Text(
-                    'No offline sensors detected.',
+                   Text(
+                    AuthStore.arabic.value
+                        ? 'لم يتم اكتشاف حساسات غير متصلة.'
+                        : 'No offline sensors detected.',
                   ),
                 Flexible(
                   child: ListView(
@@ -903,7 +939,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               '${_text(palm['deviceId'])} • ${_text(palm['id'])}',
                             ),
                             subtitle: Text(
-                              'Palm ID: ${_text(palm['id'])}',
+                              '${AuthStore.arabic.value ? 'معرّف النخلة' : 'Palm ID'}: ${_text(palm['id'])}',
                             ),
                             trailing: const Icon(
                               Icons.chevron_right,

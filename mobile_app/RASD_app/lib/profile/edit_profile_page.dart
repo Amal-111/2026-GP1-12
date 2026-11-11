@@ -46,9 +46,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (_emailController.text.trim() != AuthStore.email) {
       showCenterMessage(
         context,
-        'Your email cannot be changed here. Contact support to change it.',
-        success: false,
-        title: 'Email not changed',
+AuthStore.arabic.value
+? 'لا يمكن تغيير بريدك الإلكتروني من هنا. تواصلي مع الدعم لتغييره.'
+: 'Your email cannot be changed here. Contact support to change it.',
+success: false,
+title: AuthStore.arabic.value
+? 'لم يتم تغيير البريد الإلكتروني'
+: 'Email not changed',
       );
       return;
     }
@@ -57,17 +61,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await RasdAuthService.updateProfile(name: _nameController.text, phone: _phoneController.text);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) showRasdError(context, error, title: 'Could not save changes');
+if (mounted) {
+showRasdError(
+context,
+error,
+title: AuthStore.arabic.value
+? 'تعذر حفظ التغييرات'
+: 'Could not save changes',
+);
+}
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return PalmScaffold(
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+return PalmScaffold(
       appBar: glassAppBar(
-        title: 'Edit Profile',
+title: isArabic ? 'تعديل الملف الشخصي' : 'Edit Profile',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
@@ -99,16 +114,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                         const SizedBox(height: 20),
                         AppTextField(
-                          label: 'Full Name',
-                          hint: 'Full Name',
+label: isArabic ? 'الاسم الكامل' : 'Full Name',
+hint: isArabic ? 'الاسم الكامل' : 'Full Name',
                           icon: Icons.person_outline,
                           controller: _nameController,
                           validator: AuthValidators.name,
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Email',
-                          hint: 'Email',
+label: isArabic ? 'البريد الإلكتروني' : 'Email',
+hint: isArabic ? 'البريد الإلكتروني' : 'Email',
                           icon: Icons.mail_outline,
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -116,7 +131,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                         const SizedBox(height: 14),
                         AppTextField(
-                          label: 'Phone Number',
+label: isArabic ? 'رقم الجوال' : 'Phone Number',
                           hint: '05XXXXXXXX',
                           icon: Icons.phone_outlined,
                           controller: _phoneController,
@@ -135,13 +150,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _busy ? null : _save,
-                  child: const Text('Save Changes'),
+child: Text(
+isArabic ? 'حفظ التغييرات' : 'Save Changes',
+),
                 ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+);
+},
+);
+}
 }

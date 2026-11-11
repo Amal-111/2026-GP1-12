@@ -1,7 +1,7 @@
 // Palm helpers: input validators and a small in-memory palm store.
 import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
-
+import '../data/auth_store.dart';
 /// The Manage Palms pages use the team's shared data (MockData), so a palm
 /// added, edited or deleted here also changes in Home, the palm list,
 /// the map and the alerts.
@@ -91,14 +91,26 @@ class PalmStore {
   /// [number] is what the user typed. Returns an error message, or null
   /// if the sensor can be connected.
   String? checkDevice(String number) {
-    if (number.trim().isEmpty) return 'Device ID is required.';
-    if (!isDigits(number)) return 'Device ID must be a number.';
+    if (number.trim().isEmpty) {
+      return AuthStore.arabic.value
+          ? 'رقم المستشعر مطلوب.'
+          : 'Device ID is required.';
+    }
+    if (!isDigits(number)) {
+      return AuthStore.arabic.value
+          ? 'يجب أن يحتوي رقم المستشعر على أرقام فقط.'
+          : 'Device ID must be a number.';
+    }
     final id = deviceIdFromNumber(number);
     if (!MockData.devices.contains(id)) {
-      return 'Device not found. Please check the device ID.';
+      return AuthStore.arabic.value
+          ? 'لم يتم العثور على المستشعر. يرجى التحقق من رقمه.'
+          : 'Device not found. Please check the device ID.';
     }
     if (MockData.palms.any((p) => p.deviceId == id)) {
-      return 'This device is already connected to another palm.';
+      return AuthStore.arabic.value
+          ? 'هذا المستشعر متصل بالفعل بنخلة أخرى.'
+          : 'This device is already connected to another palm.';
     }
     return null;
   }
@@ -162,7 +174,9 @@ class PalmValidators {
   /// Checks the field is not empty.
   static String? required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'This field is required.';
+      return AuthStore.arabic.value
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
     }
     return null;
   }
@@ -170,10 +184,20 @@ class PalmValidators {
   /// Palm ID number (the part after "P"): required, 3 digits, not 000.
   static String? palmId(String? value) {
     final v = value?.trim() ?? '';
-    if (v.isEmpty) return 'This field is required.';
-    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Enter the palm ID as numbers only.';
+    if (v.isEmpty) {
+      return AuthStore.arabic.value
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
+    }
+    if (!RegExp(r'^\d+$').hasMatch(v)) {
+      return AuthStore.arabic.value
+          ? 'أدخلي رقم النخلة بالأرقام فقط.'
+          : 'Enter the palm ID as numbers only.';
+    }
     if (!RegExp(r'^\d{3}$').hasMatch(v) || v == '000') {
-      return 'Enter the palm ID as 3 digits, like 008.';
+      return AuthStore.arabic.value
+          ? 'أدخلي رقم النخلة مكونًا من 3 أرقام، مثل 008.'
+          : 'Enter the palm ID as 3 digits, like 008.';
     }
     return null;
   }
@@ -181,10 +205,14 @@ class PalmValidators {
   /// Checks the age is a valid number.
   static String? age(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'This field is required.';
+      return AuthStore.arabic.value
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
     }
     if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
-      return 'Enter the age as a whole number.';
+      return AuthStore.arabic.value
+          ? 'أدخلي العمر كعدد صحيح.'
+          : 'Enter the age as a whole number.';
     }
     return null;
   }
@@ -192,22 +220,42 @@ class PalmValidators {
   /// Checks the latitude range.
   static String? latitude(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'This field is required.';
+      return AuthStore.arabic.value
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
     }
     final n = double.tryParse(value.trim());
-    if (n == null) return 'Enter the latitude as a number, like 24.7136.';
-    if (n < -90 || n > 90) return 'Enter a latitude between -90 and 90.';
+    if (n == null) {
+      return AuthStore.arabic.value
+          ? 'أدخلي خط العرض كرقم، مثل 24.7136.'
+          : 'Enter the latitude as a number, like 24.7136.';
+    }
+    if (n < -90 || n > 90) {
+      return AuthStore.arabic.value
+          ? 'يجب أن يكون خط العرض بين -90 و90.'
+          : 'Enter a latitude between -90 and 90.';
+    }
     return null;
   }
 
   /// Checks the longitude range.
   static String? longitude(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'This field is required.';
+      return AuthStore.arabic.value
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
     }
     final n = double.tryParse(value.trim());
-    if (n == null) return 'Enter the longitude as a number, like 46.6753.';
-    if (n < -180 || n > 180) return 'Enter a longitude between -180 and 180.';
+    if (n == null) {
+      return AuthStore.arabic.value
+          ? 'أدخلي خط الطول كرقم، مثل 46.6753.'
+          : 'Enter the longitude as a number, like 46.6753.';
+    }
+    if (n < -180 || n > 180) {
+      return AuthStore.arabic.value
+          ? 'يجب أن يكون خط الطول بين -180 و180.'
+          : 'Enter a longitude between -180 and 180.';
+    }
     return null;
   }
 }
