@@ -8,11 +8,13 @@ import 'auth_widgets.dart';
 import 'login_page.dart';
 import 'sign_up_page.dart';
 import '../data/auth_store.dart';
+
 /// First page of the app: logo, Sign Up, Log In and the language switch.
 /// Put the logo image at assets/images/rasd_logo.png.
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
+  /// Builds the welcome screen in the selected language.
   @override
   Widget build(BuildContext context) {
 return ValueListenableBuilder<bool>(

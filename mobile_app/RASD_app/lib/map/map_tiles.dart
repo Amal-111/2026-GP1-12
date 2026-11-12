@@ -29,7 +29,7 @@ class RasdMap {
         ],
       );
 
-  /// Reads a location saved as text, e.g. "24.7136, 46.6753".
+  /// Parses a saved location such as "24.7136, 46.6753".
   static LatLng? parse(String text) {
     final parts = text.split(',');
     if (parts.length != 2) return null;
@@ -53,6 +53,7 @@ class MapRoundButton extends StatelessWidget {
     required this.onTap,
   });
 
+  /// Displays a map control with the shared glass style.
   @override
   Widget build(BuildContext context) {
     // Glass circle, more solid on hover / press like the other buttons.

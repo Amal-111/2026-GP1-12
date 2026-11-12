@@ -4,6 +4,7 @@ import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 import '../services/rasd_errors.dart';
 import '../data/auth_store.dart';
+
 /// Farmer accepts or rejects invitations sent by farm owners.
 class FarmRequestPage extends StatefulWidget {
   const FarmRequestPage({super.key});
@@ -45,6 +46,7 @@ class _FarmRequestPageState extends State<FarmRequestPage> {
     }
   }
 
+  /// Displays incoming farm invitations in the selected language.
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -52,7 +54,7 @@ class _FarmRequestPageState extends State<FarmRequestPage> {
       builder: (context, isArabic, child) {
         return PalmScaffold(
           appBar: glassAppBar(
-            title: isArabic ? 'طلبات المزرعة' : 'Farm Invitations',
+            title: isArabic ? 'دعوات المزارع' : 'Farm Invitations',
           ),
           body: SafeArea(
             child: StreamBuilder<List<Map<String, dynamic>>>(

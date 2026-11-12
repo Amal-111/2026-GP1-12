@@ -172,14 +172,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the page with localized labels.
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Text('Your session has ended. Please log in again.'),
+          child: Text(AuthStore.arabic.value
+              ? 'انتهت جلسة تسجيل الدخول. يرجى تسجيل الدخول مرة أخرى.'
+              : 'Your session has ended. Please log in again.'),
         ),
       );
     }
@@ -218,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         _isOwner = isOwner;
-        _userName = _text(user['fullName'], 'User');
+        _userName = _text(user['fullName'], AuthStore.arabic.value ? 'مستخدم' : 'User');
 
         if (isFarmer) {
           final assignedFarmId = _text(user['farmId']);
@@ -294,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         _farmId = farmId;
-        _farmName = _text(farm['farmName'], 'My Farm');
+        _farmName = _text(farm['farmName'], AuthStore.arabic.value ? 'مزرعتي' : 'My Farm');
 
         return StreamBuilder<DatabaseEvent>(
           key: ValueKey('palms_$farmId'),
@@ -480,7 +483,7 @@ return Scaffold(
                     children: [
                       if (_isOwner)
                         IconButton(
-                          tooltip: 'Back',
+                          tooltip: isArabic ? 'رجوع' : 'Back',
                           icon: const Icon(
                             Icons.arrow_back_ios_new_rounded,
                           ),
@@ -599,7 +602,7 @@ return Scaffold(
                     Icons.warning_rounded,
                     AppColors.suspected,
                     const Color(0xFFFDECEC),
-                    isArabic ? 'مشتبه بالأصابه' : 'Suspected',
+                    isArabic ? 'مشتبه بالإصابة' : 'Suspected',
                   ),
                 ),
               ],

@@ -49,8 +49,8 @@ class _ManagePalmsPageState extends State<ManagePalmsPage> {
       showCenterMessage(
         context,
         AuthStore.arabic.value
-            ? 'اطلبي من مالك المزرعة دعوتك إلى مزرعة قبل إضافة النخيل.'
-            : 'Ask the farm owner to invite you to a farm before adding palms.',
+            ? 'اختر مزرعة أو اطلب من مالكها دعوتك قبل إضافة النخيل.'
+            : 'Select a farm or ask its owner to invite you before adding palms.',
         success: false,
         title: AuthStore.arabic.value ? 'لا توجد مزرعة مرتبطة' : 'No farm assigned',
       );
@@ -168,6 +168,7 @@ title: AuthStore.arabic.value
     }
   }
 
+/// Translates the displayed health status without changing stored values.
 String _translateStatus(String status) {
 switch (status) {
 case 'Healthy':
@@ -195,7 +196,14 @@ title: isArabic ? 'إدارة النخيل' : 'Manage Palms',
         child: StreamBuilder<List<Palm>>(
           stream: RasdManagementService.watchPalms(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
+            if (snapshot.hasError) {
+              debugPrint('Unable to load palms: ${snapshot.error}');
+              return Center(
+                child: Text(
+                  isArabic ? 'تعذر تحميل النخيل.' : 'Unable to load palms.',
+                ),
+              );
+            }
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
             final palms = _filteredPalms(snapshot.data!);
             return Column(
@@ -206,7 +214,7 @@ title: isArabic ? 'إدارة النخيل' : 'Manage Palms',
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
 decoration: InputDecoration(
-hintText: isArabic ? 'ابحثي برقم النخلة...' : 'Search by Palm ID...',
+hintText: isArabic ? 'ابحث بمعرّف النخلة أو نوعها...' : 'Search by palm ID or type...',
 prefixIcon: const Icon(Icons.search),
 ),
                   ),

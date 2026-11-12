@@ -48,6 +48,10 @@ class FarmRequest {
 class AuthStore {
   static const String demoPassword = 'Rasd@1234';
 
+  /// Selects an error message without changing account data.
+  static String _localizedError(String english, String arabic) =>
+      AuthStore.arabic.value ? arabic : english;
+
   static final List<Account> accounts = [
     Account(
       id: 'OW001',
@@ -89,10 +93,12 @@ class AuthStore {
     return accounts.firstWhere((a) => a.role == wantedRole);
   }
 
+  /// Indicates whether a local account is active.
   static bool get isLoggedIn => _current != null;
 
   // ---------------- profile values ----------------
 
+  /// Finds the mock farmer associated with the local account.
   static FarmerData? get _farmerData {
     final account = currentAccount;
     if (account.role != UserRole.farmer) return null;
@@ -108,6 +114,7 @@ class AuthStore {
   static String get phone => currentAccount.id.length > 20 ? currentAccount.ownerPhone : (_farmerData?.phoneNumber ?? currentAccount.ownerPhone);
   static String? get farmId => _firebaseFarmId ?? _farmerData?.farmId;
 
+  /// Looks up the selected farm name in existing mock data.
   static String? get farmName {
     final id = farmId;
     if (id == null) return null;
@@ -141,7 +148,12 @@ class AuthStore {
     required String password,
     required UserRole role,
   }) {
-    if (_emailTaken(email)) return 'This email is already registered.';
+    if (_emailTaken(email)) {
+      return _localizedError(
+        'This email is already registered.',
+        'هذا البريد الإلكتروني مسجل بالفعل.',
+      );
+    }
 
     late final Account account;
     if (role == UserRole.farmer) {
@@ -181,13 +193,18 @@ class AuthStore {
     final e = email.trim().toLowerCase();
     for (final account in accounts) {
       if (account.email.toLowerCase() == e) {
-        if (account.password != password) return 'Incorrect password.';
+        if (account.password != password) {
+          return _localizedError('Incorrect password.', 'كلمة المرور غير صحيحة.');
+        }
         _current = account;
         applyCurrentUser();
         return null;
       }
     }
-    return 'No account found with this email.';
+    return _localizedError(
+      'No account found with this email.',
+      'لا يوجد حساب مسجل بهذا البريد الإلكتروني.',
+    );
   }
 
   /// Clears the local account data.
@@ -206,7 +223,10 @@ class AuthStore {
   }) {
     final account = currentAccount;
     if (_emailTaken(email, exceptId: account.id)) {
-      return 'This email is already registered.';
+      return _localizedError(
+        'This email is already registered.',
+        'هذا البريد الإلكتروني مسجل بالفعل.',
+      );
     }
 
     account.email = email.trim();
@@ -230,10 +250,16 @@ class AuthStore {
   static String? changePassword(String currentPassword, String newPassword) {
     final account = currentAccount;
     if (account.password != currentPassword) {
-      return 'The current password is incorrect.';
+      return _localizedError(
+        'The current password is incorrect.',
+        'كلمة المرور الحالية غير صحيحة.',
+      );
     }
     if (newPassword == currentPassword) {
-      return 'The new password must be different.';
+      return _localizedError(
+        'The new password must be different.',
+        'يجب أن تختلف كلمة المرور الجديدة عن الحالية.',
+      );
     }
     account.password = newPassword;
     return null;
@@ -241,6 +267,7 @@ class AuthStore {
 
   // ---------------- farm requests ----------------
 
+  /// Finds the active farm request for the current local account.
   static FarmRequest? get pendingRequest {
     final id = currentAccount.id;
     for (final r in requests) {

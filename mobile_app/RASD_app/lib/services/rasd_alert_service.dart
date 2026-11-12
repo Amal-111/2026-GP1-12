@@ -2,6 +2,8 @@
 
 import 'package:firebase_database/firebase_database.dart';
 
+import '../data/auth_store.dart';
+
 /// One alert from the database.
 class RasdAlert {
   final String id;
@@ -25,26 +27,41 @@ class RasdAlert {
   bool get isSuspected =>
       type == 'PossiblePestDetected';
 
+  /// Returns a localized title based on the stored alert type.
   String get title {
-    if (isOffline) return 'Sensor Offline';
-    if (isSuspected) return 'Potential Infestation';
-    return 'Farm Alert';
+    final isArabic = AuthStore.arabic.value;
+    if (isOffline) return isArabic ? 'المستشعر غير متصل' : 'Sensor Offline';
+    if (isSuspected) return isArabic ? 'اشتباه بوجود إصابة' : 'Potential Infestation';
+    if (type == 'UnderMonitoring') {
+      return isArabic ? 'النخلة تحت المراقبة' : 'Palm Under Monitoring';
+    }
+    return isArabic ? 'تنبيه المزرعة' : 'Farm Alert';
   }
 
+  /// Returns a localized explanation without changing Firebase data.
   String get message {
+    final isArabic = AuthStore.arabic.value;
     if (isOffline) {
-      return 'The monitoring sensor is offline. '
-          'Please check its connection.';
+      return isArabic
+          ? 'المستشعر غير متصل. يرجى التحقق من اتصاله.'
+          : 'The monitoring sensor is offline. Please check its connection.';
     }
-
     if (isSuspected) {
-      return 'Possible Red Palm Weevil activity '
-          'has been detected.';
+      return isArabic
+          ? 'تم رصد نشاط محتمل لسوسة النخيل الحمراء.'
+          : 'Possible Red Palm Weevil activity has been detected.';
     }
-
-    return 'A new alert has been recorded.';
+    if (type == 'UnderMonitoring') {
+      return isArabic
+          ? 'النخلة تحت المراقبة. يرجى متابعة حالتها.'
+          : 'The palm is under monitoring. Please continue checking its condition.';
+    }
+    return isArabic
+        ? 'تم تسجيل تنبيه جديد.'
+        : 'A new alert has been recorded.';
   }
 
+  /// Creates an alert using its original Firebase fields and identifiers.
   factory RasdAlert.fromMap(
       String id,
       String farmId,
@@ -76,6 +93,7 @@ class RasdAlertService {
   static final FirebaseDatabase _db =
       FirebaseDatabase.instance;
 
+  /// Streams and sorts the selected farm's alerts by timestamp.
   static Stream<List<RasdAlert>> watchAlerts(
       String farmId,
       ) {

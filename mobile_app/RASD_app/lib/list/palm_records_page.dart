@@ -20,6 +20,7 @@ class PalmRecordsPage extends StatelessWidget {
     this.onMarkedTreated,
   });
 
+  /// Builds the page with localized labels.
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(

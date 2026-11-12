@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
+import '../data/auth_store.dart';
 import 'selected_farm_service.dart';
 
 /// Firebase access for management screens. All writes go through callable functions.
@@ -11,6 +12,7 @@ class RasdManagementService {
   static final _db = FirebaseDatabase.instance;
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
+  /// Returns the currently selected farm ID.
   static String get farmId => SelectedFarmService.farmId;
 
   /// Calls a Cloud Function by name.
@@ -48,6 +50,7 @@ class RasdManagementService {
   /// Deletes the farm.
   static Future<void> deleteFarm() => _call('deleteFarm', {'farmId': farmId});
 
+  /// Watches the palms belonging to the selected farm.
   static Stream<List<PalmData>> watchPalms() =>
       _db.ref('palms/$farmId').onValue.map((event) {
         final value = event.snapshot.value;
@@ -82,14 +85,14 @@ class RasdManagementService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
-      throw StateError('Your session has ended. Please log in again.');
+      throw StateError((AuthStore.arabic.value ? 'انتهت جلسة تسجيل الدخول. يرجى تسجيل الدخول مرة أخرى.' : 'Your session has ended. Please log in again.'));
     }
 
     // Read the real user role and farm assignment from Firebase.
     final userSnapshot = await _db.ref('users/$uid').get();
 
     if (!userSnapshot.exists || userSnapshot.value is! Map) {
-      throw StateError('We could not find your profile. Log out and log in again.');
+      throw StateError((AuthStore.arabic.value ? 'لم نتمكن من العثور على ملفك الشخصي. سجل الخروج ثم سجل الدخول مرة أخرى.' : 'We could not find your profile. Log out and log in again.'));
     }
 
     final user = Map<String, dynamic>.from(
@@ -106,7 +109,7 @@ class RasdManagementService {
 
       if (assignedFarmId == null || assignedFarmId.isEmpty) {
         throw StateError(
-          'You are not assigned to a farm yet. Ask the farm owner to invite you.',
+          (AuthStore.arabic.value ? 'حسابك غير مرتبط بمزرعة حتى الآن. اطلب من مالك المزرعة دعوتك.' : 'You are not assigned to a farm yet. Ask the farm owner to invite you.'),
         );
       }
 
@@ -125,7 +128,7 @@ class RasdManagementService {
       if (!farmsSnapshot.exists ||
           farmsSnapshot.value is! Map) {
         throw StateError(
-          'You have no farms yet. Add a farm first.',
+          (AuthStore.arabic.value ? 'ليس لديك مزارع حتى الآن. أضف مزرعة أولًا.' : 'You have no farms yet. Add a farm first.'),
         );
       }
 
@@ -141,12 +144,12 @@ class RasdManagementService {
         resolvedFarmId = farmIds.single;
       } else {
         throw StateError(
-          'Choose a farm first, then add the palm.',
+          (AuthStore.arabic.value ? 'اختر المزرعة أولًا، ثم أضف النخلة.' : 'Choose a farm first, then add the palm.'),
         );
       }
     } else {
       throw StateError(
-        'Your account cannot add palms.',
+        (AuthStore.arabic.value ? 'حسابك لا يملك صلاحية إضافة النخيل.' : 'Your account cannot add palms.'),
       );
     }
 
@@ -157,7 +160,7 @@ class RasdManagementService {
 
     if (!farmSnapshot.exists ||
         farmSnapshot.value is! Map) {
-      throw StateError('This farm no longer exists.');
+      throw StateError((AuthStore.arabic.value ? 'هذه المزرعة لم تعد موجودة.' : 'This farm no longer exists.'));
     }
 
     final farm = Map<String, dynamic>.from(
@@ -166,7 +169,7 @@ class RasdManagementService {
 
     if (farm['deleting'] == true) {
       throw StateError(
-        'This farm is being deleted. Try again later.',
+        (AuthStore.arabic.value ? 'يتم حذف هذه المزرعة حاليًا. حاول مرة أخرى لاحقًا.' : 'This farm is being deleted. Try again later.'),
       );
     }
 
@@ -201,6 +204,7 @@ class RasdManagementService {
     'farmId': farmId, 'palmId': palm.id,
   });
 
+  /// Watches farmers assigned to the selected farm.
   static Stream<List<FarmerData>> watchFarmers() =>
       _db.ref('users').orderByChild('farmId').equalTo(farmId).onValue.map((event) {
         if (event.snapshot.value is! Map) return <FarmerData>[];
@@ -221,11 +225,44 @@ class RasdManagementService {
     'farmId': farmId, 'email': email.trim(),
   });
 
+  /// Searches for available farmers by name.
+  static Future<List<Map<String, String>>> searchFarmers(
+      String name,
+      ) async {
+    final result = await _functions
+        .httpsCallable('searchFarmers')
+        .call({
+      'farmId': farmId,
+      'name': name.trim(),
+    });
+
+    final data = Map<String, dynamic>.from(result.data as Map);
+    final items = data['farmers'] as List? ?? [];
+
+    return items.map((item) {
+      final farmer = Map<String, dynamic>.from(item as Map);
+
+      return <String, String>{
+        'farmerId': farmer['farmerId'].toString(),
+        'fullName': farmer['fullName'].toString(),
+      };
+    }).toList();
+  }
+
+  /// Sends an invitation to the selected Firebase farmer UID.
+  static Future<void> inviteFarmerById(String farmerId) =>
+      _call('sendInvitation', {
+        'farmId': farmId,
+        'farmerId': farmerId,
+      });
+
+
   /// Removes a farmer from the farm.
   static Future<void> removeFarmer(String farmerId) => _call('removeFarmer', {
     'farmId': farmId, 'farmerId': farmerId,
   });
 
+  /// Watches invitations sent for the selected farm.
   static Stream<List<Map<String, dynamic>>> watchInvitations() =>
       _db.ref('farmInvitations').orderByChild('farmId').equalTo(farmId).onValue.map((event) {
         if (event.snapshot.value is! Map) return <Map<String, dynamic>>[];
@@ -239,6 +276,7 @@ class RasdManagementService {
   static Future<void> cancelInvitation(String id) =>
       _call('cancelInvitation', {'invitationId': id});
 
+  /// Watches invitations received by the signed-in farmer.
   static Stream<List<Map<String, dynamic>>> watchMyInvitations() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return _db.ref('farmInvitations').orderByChild('farmerId').equalTo(uid).onValue.map((event) {
@@ -264,21 +302,22 @@ class RasdManagementService {
     final snapshot = await _db.ref('users/$farmerId').get();
 
     if (!snapshot.exists || snapshot.value is! Map) {
-      return 'Unknown Farmer';
+      return (AuthStore.arabic.value ? 'مزارع غير معروف' : 'Unknown Farmer');
     }
 
     final data = Map<String, dynamic>.from(snapshot.value as Map);
-    return (data['email'] ?? 'Unknown Farmer').toString();
+    return (data['email'] ?? (AuthStore.arabic.value ? 'مزارع غير معروف' : 'Unknown Farmer')).toString();
   }
 
+  /// Loads the farm name and owner name for an invitation.
   static Future<Map<String, String>> getInvitationFarmInfo(
       String farmId) async {
     final farmSnapshot = await _db.ref('farms/$farmId').get();
 
     if (!farmSnapshot.exists || farmSnapshot.value is! Map) {
       return {
-        'farmName': 'Unknown Farm',
-        'ownerName': 'Unknown Owner',
+        'farmName': (AuthStore.arabic.value ? 'مزرعة غير معروفة' : 'Unknown Farm'),
+        'ownerName': (AuthStore.arabic.value ? 'مالك غير معروف' : 'Unknown Owner'),
       };
     }
 
@@ -288,7 +327,7 @@ class RasdManagementService {
 
     final ownerId = (farm['ownerId'] ?? '').toString();
 
-    String ownerName = 'Unknown Owner';
+    String ownerName = (AuthStore.arabic.value ? 'مالك غير معروف' : 'Unknown Owner');
 
     if (ownerId.isNotEmpty) {
       final ownerSnapshot = await _db.ref('users/$ownerId').get();
@@ -297,17 +336,18 @@ class RasdManagementService {
         final owner = Map<String, dynamic>.from(
           ownerSnapshot.value as Map,
         );
-        ownerName = (owner['fullName'] ?? 'Unknown Owner').toString();
+        ownerName = (owner['fullName'] ?? (AuthStore.arabic.value ? 'مالك غير معروف' : 'Unknown Owner')).toString();
       }
     }
 
     return {
-      'farmName': (farm['farmName'] ?? 'Unknown Farm').toString(),
+      'farmName': (farm['farmName'] ?? (AuthStore.arabic.value ? 'مزرعة غير معروفة' : 'Unknown Farm')).toString(),
       'ownerName': ownerName,
     };
   }
 
 
+  /// Loads invitation details through the secured Cloud Function.
   static Future<Map<String, String>> getInvitationDetails(
       String invitationId,
       ) async {
@@ -318,9 +358,10 @@ class RasdManagementService {
     final data = Map<String, dynamic>.from(result.data as Map);
 
     return {
-      'farmName': (data['farmName'] ?? 'Unknown Farm').toString(),
-      'ownerName': (data['ownerName'] ?? 'Unknown Owner').toString(),
-      'farmerEmail': (data['farmerEmail'] ?? 'Unknown Farmer').toString(),
+      'farmName': (data['farmName'] ?? (AuthStore.arabic.value ? 'مزرعة غير معروفة' : 'Unknown Farm')).toString(),
+      'ownerName': (data['ownerName'] ?? (AuthStore.arabic.value ? 'مالك غير معروف' : 'Unknown Owner')).toString(),
+      'farmerName': (data['farmerName'] ?? (AuthStore.arabic.value ? 'مزارع غير معروف' : 'Unknown Farmer')).toString(),
+      'farmerEmail': (data['farmerEmail'] ?? (AuthStore.arabic.value ? 'مزارع غير معروف' : 'Unknown Farmer')).toString(),
     };
   }
 

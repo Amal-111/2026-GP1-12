@@ -10,6 +10,7 @@ import '../theme/glass_widgets.dart';
 import 'change_password_page.dart';
 import 'edit_profile_page.dart';
 import 'guidance_page.dart';
+import '../services/rasd_errors.dart';
 
 /// Profile page. Used as the Profile tab in Home and as a normal page
 /// (for example from the profile button in My Farms).
@@ -26,7 +27,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  /// Opens a page and shows a success message when it returns.
+  /// Opens a profile page and shows a message after successful changes.
   Future<void> _open(Widget page, String successMessage) async {
     final done = await Navigator.push<bool>(
       context,
@@ -39,7 +40,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  /// Asks for confirmation, then logs out.
+  /// Confirms sign-out and returns to the welcome screen.
   Future<void> _confirmLogOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -83,7 +84,6 @@ return ValueListenableBuilder<bool>(
 valueListenable: AuthStore.arabic,
 builder: (context, isArabic, child) {
 final isFarmer = AuthStore.role == UserRole.farmer;
-final farmLabel = AuthStore.farmName ?? 'No farm assigned';
 
 return PalmScaffold(
       appBar: glassAppBar(
@@ -299,6 +299,7 @@ class _Chip extends StatelessWidget {
 
   const _Chip(this.text, {this.filled = false});
 
+  /// Builds the account information chip.
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -328,6 +329,7 @@ class _SectionLabel extends StatelessWidget {
 
   const _SectionLabel(this.text);
 
+  /// Builds a settings section label.
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -348,6 +350,7 @@ class _SectionLabel extends StatelessWidget {
 class _RowDivider extends StatelessWidget {
   const _RowDivider();
 
+  /// Builds the separator between settings.
   @override
   Widget build(BuildContext context) {
     return Divider(
@@ -362,6 +365,7 @@ class _RowDivider extends StatelessWidget {
 class _Chevron extends StatelessWidget {
   const _Chevron();
 
+  /// Builds the navigation chevron.
   @override
   Widget build(BuildContext context) {
     return const Icon(
@@ -385,6 +389,7 @@ class _MenuRow extends StatelessWidget {
     this.onTap,
   });
 
+  /// Builds one profile action row.
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -422,14 +427,35 @@ class _MenuRow extends StatelessWidget {
 class _LanguagePills extends StatelessWidget {
   const _LanguagePills();
 
+  /// Builds the saved language selector.
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: AuthStore.arabic,
       builder: (context, isArabic, _) {
+        // Saves the selected language before updating its indicator.
         Widget pill(String text, bool selected, bool arabicValue) {
           return GestureDetector(
-            onTap: () => AuthStore.arabic.value = arabicValue,
+
+            onTap: () async {
+              // Do nothing if the selected language is already active.
+              if (AuthStore.arabic.value == arabicValue) return;
+
+              try {
+                await RasdAuthService.updatePreferredLanguage(arabicValue);
+              } catch (error) {
+                if (context.mounted) {
+                  showRasdError(
+                    context,
+                    error,
+                    title: AuthStore.arabic.value
+                        ? 'تعذر تغيير اللغة'
+                        : 'Could not change language',
+                  );
+                }
+              }
+            },
+
             child: Container(
               margin: const EdgeInsets.only(left: 4),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

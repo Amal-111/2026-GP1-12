@@ -41,6 +41,7 @@ class _FarmLocationPickerState extends State<FarmLocationPicker> {
   /// True for satellite view, false for map view.
   bool _satellite = true;
 
+  /// Returns a valid selected map position.
   LatLng? get _pin {
     final lat = widget.latitude;
     final lng = widget.longitude;

@@ -14,6 +14,7 @@ import '../data/auth_store.dart';
 class MyFarmsPage extends StatelessWidget {
   const MyFarmsPage({super.key});
 
+  /// Syncs the selected Firebase farm with older app screens.
   static void _selectFarmForLegacyScreens(FarmRecord farm) {
     MockData.farms.removeWhere((f) => f.id == farm.id);
     MockData.farms.add(RasdFarm(farm.id, farm.name,
@@ -23,6 +24,8 @@ class MyFarmsPage extends StatelessWidget {
     MockData.selectedFarmId = farm.id;
     MockData.notifyChange();
   }
+
+/// Builds the page using the selected language.
 
 @override
 Widget build(BuildContext context) {
@@ -63,7 +66,11 @@ title: isArabic ? 'مزارعي' : 'My Farms',
           stream: RasdFarmsService.watchMyFarms(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return Center(child: Text('Unable to load farms: ${snapshot.error}'));
+              return Center(
+                child: Text(
+                  isArabic ? 'تعذر تحميل المزارع.' : 'Unable to load farms.',
+                ),
+              );
             }
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -169,6 +176,8 @@ required this.onTap,
 required this.onManage,
 });
 
+  /// Builds the page using the selected language.
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -210,7 +219,7 @@ required this.onManage,
                 const SizedBox(height: 4),
 
 Text(
-isArabic ? '$palmCount النخيل ' : '$palmCount Total Palms',
+isArabic ? 'عدد النخيل: $palmCount' : '$palmCount Total Palms',
 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
 color: AppColors.textSecondary,
 ),

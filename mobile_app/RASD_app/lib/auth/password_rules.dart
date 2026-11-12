@@ -1,16 +1,16 @@
 
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../data/auth_store.dart';
 
-/// The password rules of the app.
+/// Password validation rules used across the app.
 class PasswordRules {
   PasswordRules._();
 
   static const int rulesCount = 5;
 
+  /// Returns the five password requirements in the selected language.
   static List<String> labels(bool isArabic) => isArabic
       ? [
     '8 أحرف على الأقل',
@@ -27,6 +27,7 @@ class PasswordRules {
     'A special character (! @ # \$ ...)',
   ];
 
+  /// Checks each password requirement.
   static List<bool> check(String password) => [
     password.length >= 8,
     RegExp(r'[A-Z]').hasMatch(password),
@@ -35,18 +36,38 @@ class PasswordRules {
     RegExp(r'[^A-Za-z0-9\s]').hasMatch(password),
   ];
 
-  static int score(String password) =>
-      check(password).where((ok) => ok).length;
+  /// Counts how many password requirements are satisfied.
+  static int score(String password) {
+    return check(password).where((ok) => ok).length;
+  }
 
-  static bool isStrong(String password) =>
-      score(password) == rulesCount;
+  /// Checks whether the password satisfies all five requirements.
+  static bool isStrong(String password) {
+    return score(password) == rulesCount;
+  }
 
+  /// Returns a localized validation message for missing requirements.
   static String? validate(String? password) {
     final value = password ?? '';
-    if (value.isEmpty) return 'This field is required.';
+    final isArabic = AuthStore.arabic.value;
+
+    if (value.isEmpty) {
+      return isArabic
+          ? 'هذا الحقل مطلوب.'
+          : 'This field is required.';
+    }
 
     final results = check(value);
-    final missing = <String>[
+
+    final missing = isArabic
+        ? <String>[
+      if (!results[0]) '8 أحرف على الأقل',
+      if (!results[1]) 'حرف كبير',
+      if (!results[2]) 'حرف صغير',
+      if (!results[3]) 'رقم',
+      if (!results[4]) 'رمز خاص',
+    ]
+        : <String>[
       if (!results[0]) 'at least 8 characters',
       if (!results[1]) 'an uppercase letter',
       if (!results[2]) 'a lowercase letter',
@@ -54,22 +75,39 @@ class PasswordRules {
       if (!results[4]) 'a special character',
     ];
 
-    if (missing.isEmpty) return null;
-    return 'Add ${_join(missing)}.';
+    if (missing.isEmpty) {
+      return null;
+    }
+
+    return isArabic
+        ? 'يجب أن تحتوي كلمة المرور على: ${_join(missing, true)}.'
+        : 'Add ${_join(missing, false)}.';
   }
 
-  static String _join(List<String> items) {
-    if (items.length == 1) return items.first;
-    return '${items.sublist(0, items.length - 1).join(', ')} and ${items.last}';
+  /// Joins missing requirements into one readable message.
+  static String _join(List<String> items, bool isArabic) {
+    if (items.length == 1) {
+      return items.first;
+    }
+
+    final separator = isArabic ? '، ' : ', ';
+    final lastConnector = isArabic ? ' و' : ' and ';
+
+    return '${items.sublist(0, items.length - 1).join(separator)}'
+        '$lastConnector${items.last}';
   }
 }
 
-/// Checklist and strength bar shown under a password field.
+/// Displays password strength and the five requirement indicators.
 class PasswordRulesBox extends StatelessWidget {
   final TextEditingController controller;
 
-  const PasswordRulesBox({super.key, required this.controller});
+  const PasswordRulesBox({
+    super.key,
+    required this.controller,
+  });
 
+  /// Builds the live password strength indicator.
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -83,13 +121,20 @@ class PasswordRulesBox extends StatelessWidget {
         final score = PasswordRules.score(controller.text);
         final labels = PasswordRules.labels(isArabic);
 
+        // Convert the score into four visual strength segments.
         final filled = score == 0
             ? 0
-            : (score <= 2 ? 1 : (score == 3 ? 2 : (score == 4 ? 3 : 4)));
+            : (score <= 2
+            ? 1
+            : (score == 3
+            ? 2
+            : (score == 4 ? 3 : 4)));
 
         final color = score <= 2
             ? AppColors.suspected
-            : (score < 5 ? AppColors.monitoring : AppColors.primary);
+            : (score < 5
+            ? AppColors.monitoring
+            : AppColors.primary);
 
         final strengthLabel = score == 0
             ? ''
@@ -108,6 +153,7 @@ class PasswordRulesBox extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Password strength bar.
               Row(
                 children: [
                   for (var i = 0; i < 4; i++) ...[
@@ -139,7 +185,10 @@ class PasswordRulesBox extends StatelessWidget {
                   ),
                 ],
               ),
+
               const SizedBox(height: 8),
+
+              // Live checklist of password requirements.
               for (var i = 0; i < labels.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),

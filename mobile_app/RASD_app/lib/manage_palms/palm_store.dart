@@ -38,6 +38,7 @@ class PalmStore {
     return MockData.selectedFarmId;
   }
 
+  /// Returns palms belonging to the active farm.
   List<PalmData> get palms {
     final farmId = activeFarmId;
     if (farmId == null || farmId.isEmpty) return [];
@@ -75,6 +76,7 @@ class PalmStore {
   /// True when the text contains only digits.
   static bool isDigits(String value) => RegExp(r'^\d+$').hasMatch(value.trim());
 
+  /// Pads a numeric identifier using the existing ID convention.
   static String _pad(String number) =>
       (int.tryParse(number.trim()) ?? 0).toString().padLeft(3, '0');
 
@@ -191,12 +193,12 @@ class PalmValidators {
     }
     if (!RegExp(r'^\d+$').hasMatch(v)) {
       return AuthStore.arabic.value
-          ? 'أدخلي رقم النخلة بالأرقام فقط.'
+          ? 'أدخل رقم النخلة بالأرقام فقط.'
           : 'Enter the palm ID as numbers only.';
     }
     if (!RegExp(r'^\d{3}$').hasMatch(v) || v == '000') {
       return AuthStore.arabic.value
-          ? 'أدخلي رقم النخلة مكونًا من 3 أرقام، مثل 008.'
+          ? 'أدخل رقم النخلة مكونًا من 3 أرقام، مثل 008.'
           : 'Enter the palm ID as 3 digits, like 008.';
     }
     return null;
@@ -211,7 +213,7 @@ class PalmValidators {
     }
     if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
       return AuthStore.arabic.value
-          ? 'أدخلي العمر كعدد صحيح.'
+          ? 'أدخل العمر كعدد صحيح.'
           : 'Enter the age as a whole number.';
     }
     return null;
@@ -227,7 +229,7 @@ class PalmValidators {
     final n = double.tryParse(value.trim());
     if (n == null) {
       return AuthStore.arabic.value
-          ? 'أدخلي خط العرض كرقم، مثل 24.7136.'
+          ? 'أدخل خط العرض كرقم، مثل 24.7136.'
           : 'Enter the latitude as a number, like 24.7136.';
     }
     if (n < -90 || n > 90) {
@@ -248,7 +250,7 @@ class PalmValidators {
     final n = double.tryParse(value.trim());
     if (n == null) {
       return AuthStore.arabic.value
-          ? 'أدخلي خط الطول كرقم، مثل 46.6753.'
+          ? 'أدخل خط الطول كرقم، مثل 46.6753.'
           : 'Enter the longitude as a number, like 46.6753.';
     }
     if (n < -180 || n > 180) {
