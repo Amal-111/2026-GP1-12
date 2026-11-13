@@ -89,6 +89,28 @@ function databaseEndpoint(): URL {
 
 type DatabaseRoot = Record<string, any>;
 const MAX_RETRIES = 5;
+const REST_TIMEOUT_MS = 15000;
+const RETRY_BASE_MS = 120;
+
+// Limit the duration of root ETag requests until the schema is migrated.
+async function requestWithTimeout(endpoint: URL, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(endpoint, {
+      ...options,
+      signal: AbortSignal.timeout(REST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    console.error('Palm database request failed:', error);
+    throw new HttpsError('unavailable', 'Palm database is unavailable. Try again.');
+  }
+}
+
+// Reduce repeated conflicts without changing the existing atomic write.
+async function waitAfterConflict(attempt: number): Promise<void> {
+  const cap = Math.min(1000, RETRY_BASE_MS * 2 ** attempt);
+  const delay = Math.floor(cap / 2 + Math.random() * cap / 2);
+  await new Promise<void>(resolve => setTimeout(resolve, delay));
+}
 
 // Add a new palm and pair its sensor.
 export const addPalm = onCall(options, async (request) => {
@@ -114,7 +136,7 @@ export const addPalm = onCall(options, async (request) => {
 
   // Retry with fresh data when any concurrent database write occurs.
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const response = await fetch(endpoint, {
+    const response = await requestWithTimeout(endpoint, {
       method: 'GET',
       headers: {
         ...authHeaders,
@@ -149,11 +171,12 @@ export const addPalm = onCall(options, async (request) => {
     }
 
     // Recheck access against the current snapshot, not a previous one.
+    const currentUser = root.users?.[user.uid];
     const hasAccess = user.role === 'FarmOwner'
-      ? farm.ownerId === user.uid
+      ? (currentUser?.role === 'FarmOwner' && farm.ownerId === user.uid)
       : (user.role === 'Farmer' &&
-          root.users?.[user.uid]?.role === 'Farmer' &&
-          root.users[user.uid].farmId === farmId);
+          currentUser?.role === 'Farmer' &&
+          currentUser.farmId === farmId);
 
     if (!hasAccess) {
       throw new HttpsError('permission-denied', 'No access to this farm.');
@@ -215,7 +238,7 @@ export const addPalm = onCall(options, async (request) => {
     farm.lastPalmNumber = nextNumber;
 
     // A changed ETag rejects the entire write (HTTP 412).
-    const writeResponse = await fetch(endpoint, {
+    const writeResponse = await requestWithTimeout(endpoint, {
       method: 'PUT',
       headers: {
         ...authHeaders,
@@ -231,6 +254,9 @@ export const addPalm = onCall(options, async (request) => {
     }
 
     if (writeResponse.status === 412) {
+      if (attempt + 1 < MAX_RETRIES) {
+        await waitAfterConflict(attempt);
+      }
       continue;
     }
 
@@ -385,7 +411,6 @@ export const deletePalm = onCall(options, async (request) => {
   const updates: Record<string, unknown> = {
     [`palms/${farmId}/${palmId}`]: null,
     [`monitoringHistory/${farmId}/${palmId}`]: null,
-    [`treatmentRecords/${farmId}/${palmId}`]: null,
   };
 
   if (deviceId) {
@@ -404,6 +429,8 @@ export const deletePalm = onCall(options, async (request) => {
         connectionStatus: 'Offline',
       };
 
+      // Remove readings associated with this released device.
+      updates[`sensorReadings/${deviceId}`] = null;
       updates[`monitoringState/${deviceId}`] = null;
     }
   }

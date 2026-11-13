@@ -4,7 +4,8 @@
     ".write": false,
     "users": {
       ".indexOn": [
-        "farmId"
+        "farmId",
+        "fullName"
       ],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || (data.child('role').val() === 'Farmer' && data.child('farmId').isString() && root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid))"
@@ -40,16 +41,6 @@
         }
       }
     },
-    "treatmentRecords": {
-      "$farmId": {
-        ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))",
-        "$palmId": {
-          ".indexOn": [
-            "treatmentDate"
-          ]
-        }
-      }
-    },
     "alerts": {
       "$farmId": {
         ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))",
@@ -67,7 +58,14 @@
         ".read": "auth != null && (data.child('farmerId').val() === auth.uid || root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid)"
       },
       ".read": "auth != null && ((query.orderByChild === 'farmerId' && query.equalTo === auth.uid) || (query.orderByChild === 'farmId' && query.equalTo !== null && root.child('farms').child(query.equalTo).child('ownerId').val() === auth.uid))"
+    },
+    "sensorReadings": {
+      "$deviceId": {
+        ".read": "auth != null && root.child('monitoringDevices').child($deviceId).child('farmId').isString() && (root.child('farms').child(root.child('monitoringDevices').child($deviceId).child('farmId').val()).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === root.child('monitoringDevices').child($deviceId).child('farmId').val()))",
+        ".indexOn": [
+          "timestamp"
+        ]
+      }
     }
   }
 }
- 

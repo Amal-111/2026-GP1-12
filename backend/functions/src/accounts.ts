@@ -57,7 +57,6 @@ export const deleteAccount = onCall(options, async request => {
     updates[`farms/${farmId}`] = null;
     updates[`palms/${farmId}`] = null;
     updates[`monitoringHistory/${farmId}`] = null;
-    updates[`treatmentRecords/${farmId}`] = null;
     updates[`alerts/${farmId}`] = null;
   }
 
@@ -76,6 +75,8 @@ export const deleteAccount = onCall(options, async request => {
         connectionStatus: 'Offline',
       };
 
+      // The released device no longer owns historical sensor samples.
+      updates[`sensorReadings/${deviceId}`] = null;
       updates[`monitoringState/${deviceId}`] = null;
     }
 
@@ -190,6 +191,31 @@ export const updateProfile = onCall(options, async request => {
   }
   await db().ref(`users/${user.uid}`).update(patch);
   return {success: true};
+});
+
+export const syncVerifiedEmail = onCall(options, async request => {
+  // Only the signed-in user can sync their own email.
+  const user = await actor(request);
+
+  // Read the email directly from Firebase Authentication.
+  const authUser = await getAuth().getUser(user.uid);
+
+  if (!authUser.email || !authUser.emailVerified) {
+    throw new HttpsError(
+      'failed-precondition',
+      'A verified email is required.'
+    );
+  }
+
+  const verifiedEmail = authUser.email.trim();
+
+  // Update the saved profile using the verified Auth email.
+  await db().ref(`users/${user.uid}/email`).set(verifiedEmail);
+
+  return {
+    success: true,
+    email: verifiedEmail,
+  };
 });
 
 

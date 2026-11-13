@@ -5,8 +5,31 @@ import {actor, db, farmAccess, id, object, stringField, optionalText} from './co
 
 const options = {region: 'us-central1', maxInstances: 10};
 const MAX_RETRIES = 5;
+const REST_TIMEOUT_MS = 15000;
+const RETRY_BASE_DELAY_MS = 120;
+const RETRY_MAX_DELAY_MS = 1000;
 
 type DbObject = Record<string, any>;
+
+// Spread conflicting retries to reduce repeated root-level ETag collisions.
+async function waitAfterConflict(attempt: number): Promise<void> {
+  const ceiling = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt);
+  const delay = Math.floor(ceiling / 2 + Math.random() * ceiling / 2);
+  await new Promise<void>(resolve => setTimeout(resolve, delay));
+}
+
+// Bound individual REST requests so a stalled connection does not hang the call.
+async function requestWithTimeout(url: URL, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(REST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    console.error('Treatment database request failed:', error);
+    throw new HttpsError('unavailable', 'Treatment database is unavailable. Try again.');
+  }
+}
 
 // Build the REST endpoint for the current database.
 function databaseEndpoint(): URL {
@@ -100,13 +123,29 @@ export const recordTreatment = onCall(options, async (request) => {
   }
 
   // Generate record IDs only once.
-  const treatmentId = db().ref('treatmentRecords').push().key;
+  
+  // Generate one ID for the unified history event.
   const historyId = db().ref('monitoringHistory').push().key;
 
-  if (!treatmentId || !historyId) {
+  if (!historyId) {
     throw new HttpsError(
       'internal',
-      'Unable to generate record IDs.'
+      'Unable to generate a history record ID.'
+    );
+  }
+
+
+  // A cheap scoped preflight avoids downloading the entire database for
+  // requests that clearly cannot be accepted. The ETag loop below is still
+  // authoritative and repeats the checks to prevent time-of-check races.
+  const [farmCheck, palmCheck] = await Promise.all([
+    db().ref(`farms/${farmId}/deleting`).get(),
+    db().ref(`palms/${farmId}/${palmId}/healthStatus`).get(),
+  ]);
+  if (farmCheck.val() === true || palmCheck.val() !== 'Suspected') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Palm must be Suspected and accessible.'
     );
   }
 
@@ -123,9 +162,12 @@ export const recordTreatment = onCall(options, async (request) => {
   ? {Authorization: 'Bearer owner'}
   : {Authorization: `Bearer ${token}`};
 
-  // Retry when another operation changes the database.
+  // The current schema stores palm status and history in separate root paths.
+  // A root ETag update keeps both changes atomic; do not replace this with
+  // independent writes. The root-level approach still needs redesign for scale.
+  // Retry if another writer changes the database.
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const response = await fetch(endpoint, {
+    const response = await requestWithTimeout(endpoint, {
       method: 'GET',
       headers: {
         ...authHeaders,
@@ -190,31 +232,29 @@ export const recordTreatment = onCall(options, async (request) => {
     }
 
     // Save the treatment.
-    root.treatmentRecords ??= {};
-    root.treatmentRecords[farmId] ??= {};
-    root.treatmentRecords[farmId][palmId] ??= {};
-
-    root.treatmentRecords[farmId][palmId][treatmentId] = {
-      treatmentDate,
-      treatmentMethod,
-      ...(notes ? {notes} : {}),
-    };
-
-    // Update the palm status.
+    
+    // Update the palm status after treatment.
     palm.healthStatus = 'UnderMonitoring';
 
-    // Record the status change in monitoring history.
+    // Save one unified treatment event.
     root.monitoringHistory ??= {};
     root.monitoringHistory[farmId] ??= {};
     root.monitoringHistory[farmId][palmId] ??= {};
 
     root.monitoringHistory[farmId][palmId][historyId] = {
+      eventType: 'Treatment',
       healthStatus: 'UnderMonitoring',
       timestamp,
+      treatmentDetails: {
+        treatmentDate,
+        treatmentMethod,
+        ...(notes ? {notes} : {}),
+      },
     };
 
+
     // Write only if the database has not changed.
-    const writeResponse = await fetch(endpoint, {
+    const writeResponse = await requestWithTimeout(endpoint, {
       method: 'PUT',
       headers: {
         ...authHeaders,
@@ -224,15 +264,20 @@ export const recordTreatment = onCall(options, async (request) => {
       body: JSON.stringify(root),
     });
 
+    
     if (writeResponse.ok) {
       return {
         success: true,
-        treatmentId,
+        historyId,
       };
     }
 
+
     // A concurrent change occurred; read again and retry.
     if (writeResponse.status === 412) {
+      if (attempt + 1 < MAX_RETRIES) {
+        await waitAfterConflict(attempt);
+      }
       continue;
     }
 

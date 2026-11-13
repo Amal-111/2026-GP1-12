@@ -1,4 +1,5 @@
 import {onRequest} from 'firebase-functions/v2/https';
+import {timingSafeEqual} from 'node:crypto';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {defineSecret} from 'firebase-functions/params';
 import {db, id} from './common';
@@ -10,6 +11,26 @@ const CONFIRMATIONS = 3;
 const OFFLINE_AFTER_MS = 15 * 60 * 1000;
 
 type Result = 'Healthy' | 'Suspected';
+
+// Compare configured gateway credentials without a timing-dependent string match.
+function validGatewayKey(provided: string | undefined, expected: string): boolean {
+  if (!provided || !expected) return false;
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+
+// Accept bounded numeric vibration samples without changing older gateways.
+function validVibrationData(value: unknown): value is number[] {
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= 2048 &&
+    value.every(sample =>
+      typeof sample === 'number' &&
+      Number.isFinite(sample)
+    );
+}
 function validNumber(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }
@@ -17,7 +38,12 @@ function appendHistory(root: any, farmId: string, palmId: string, status: string
   root.monitoringHistory ??= {};
   root.monitoringHistory[farmId] ??= {};
   root.monitoringHistory[farmId][palmId] ??= {};
-  root.monitoringHistory[farmId][palmId][key] = {healthStatus: status, timestamp};
+
+  root.monitoringHistory[farmId][palmId][key] = {
+    eventType: 'Monitoring',
+    healthStatus: status,
+    timestamp,
+  };
 }
 function appendAlert(root: any, farmId: string, palmId: string, alertType: string, timestamp: number, key: string): void {
   root.alerts ??= {};
@@ -32,7 +58,7 @@ export const receiveSensorData = onRequest(
   async (req, res) => {
     if (req.method !== 'POST') {res.status(405).send('Method not allowed'); return;}
     const expected = gatewayKey.value();
-    if (!expected || req.get('x-rasd-gateway-key') !== expected) {
+    if (!validGatewayKey(req.get('x-rasd-gateway-key'), expected)) {
       res.status(401).send('Unauthorized'); return;
     }
     const data = req.body;
@@ -41,14 +67,30 @@ export const receiveSensorData = onRequest(
     }
     let deviceId: string;
     try {deviceId = id(data.deviceId, 'deviceId');} catch {res.status(400).send('Invalid deviceId'); return;}
-    const {temperature, humidity, result} = data;
+    const {temperature, humidity, result, vibrationData} = data;
     if (!validNumber(temperature, -40, 85) || !validNumber(humidity, 0, 100) ||
         (result !== 'Healthy' && result !== 'Suspected')) {
       res.status(400).send('Invalid readings/result'); return;
     }
+    if (vibrationData !== undefined && !validVibrationData(vibrationData)) {
+      res.status(400).send('Invalid vibrationData'); return;
+    }
     const now = Date.now();
-    const historyKey = db().ref('monitoringHistory').push().key!;
-    const alertKey = db().ref('alerts').push().key!;
+
+    // Reject invalid/unpaired devices before opening an expensive root transaction.
+    // The transaction below rechecks all links because they may change meanwhile.
+    const deviceSnapshot = await db().ref(`monitoringDevices/${deviceId}`).get();
+    const linkedDevice = deviceSnapshot.val();
+    if (!linkedDevice?.farmId || !linkedDevice?.palmId) {
+      res.status(409).json({error: 'Device not paired or farm unavailable'});
+      return;
+    }
+
+    // A request overtaken by a newer reading must not restore older sensor state.
+
+const readingKey = db().ref('sensorReadings').push().key!;
+const historyKey = db().ref('monitoringHistory').push().key!;
+const alertKey = db().ref('alerts').push().key!;
     const tx = await db().ref().transaction(root => {
       const device = root?.monitoringDevices?.[deviceId];
       if (!device?.farmId || !device?.palmId) return;
@@ -57,10 +99,27 @@ export const receiveSensorData = onRequest(
       const farm = root.farms?.[farmId];
       const palm = root.palms?.[farmId]?.[palmId];
       if (!farm || farm.deleting || !palm || palm.deviceId !== deviceId) return;
+      if (typeof device.lastSeen === 'number' && device.lastSeen > now) return;
       device.temperature = temperature;
       device.humidity = humidity;
       device.lastSeen = now;
       device.connectionStatus = 'Online';
+
+      // Save the incoming sensor reading.
+      root.sensorReadings ??= {};
+      root.sensorReadings[deviceId] ??= {};
+
+      root.sensorReadings[deviceId][readingKey] = {
+        timestamp: now,
+        temperature,
+        humidity,
+        // Preserve historical gateway payloads that lack vibration samples.
+        ...(vibrationData !== undefined ? {vibrationData} : {}),
+        detectionResult: {
+          result,
+        },
+      };
+
       // Internal streak data stays in a private backend-only path.
       root.monitoringState ??= {};
       const prev = root.monitoringState[deviceId] ?? {};
@@ -85,22 +144,39 @@ export const checkOfflineDevices = onSchedule(
   {schedule: 'every 5 minutes', timeZone: 'Etc/UTC', region: REGION},
   async () => {
     const now = Date.now();
+    // Most scheduled runs have nothing to change. Avoid a root transaction
+    // unless at least one connected device is a candidate for an offline alert.
+    // The transaction still rechecks freshness before changing anything.
+    const onlineSnapshot = await db().ref('monitoringDevices')
+      .orderByChild('connectionStatus').equalTo('Online').get();
+    let hasCandidate = false;
+    onlineSnapshot.forEach(child => {
+      const device = child.val();
+      if (device?.farmId && device?.palmId &&
+          typeof device.lastSeen === 'number' &&
+          now - device.lastSeen >= OFFLINE_AFTER_MS) {
+        hasCandidate = true;
+      }
+    });
+    if (!hasCandidate) return;
+
     // Generate one stable ID per device outside the retryable transaction.
     const alertKeys: Record<string, string> = {};
-    const devices = await db().ref('monitoringDevices').get();
-    devices.forEach(child => {alertKeys[child.key!] = db().ref('alerts').push().key!;});
+    onlineSnapshot.forEach(child => {
+      alertKeys[child.key!] = db().ref('alerts').push().key!;
+    });
     await db().ref().transaction(root => {
       if (!root?.monitoringDevices) return;
       let changed = false;
-      for (const device of Object.values(root.monitoringDevices) as any[]) {
+      for (const [deviceId, device] of Object.entries(root.monitoringDevices) as [string, any][]) {
         if (!device.farmId || !device.palmId || device.connectionStatus !== 'Online') continue;
         const farm = root.farms?.[device.farmId];
         const palm = root.palms?.[device.farmId]?.[device.palmId];
-        if (!farm || farm.deleting || !palm || !palm.deviceId) continue;
+        // Do not change a device if the palm has since been paired elsewhere.
+        if (!farm || farm.deleting || !palm || palm.deviceId !== deviceId) continue;
         // No lastSeen yet: don't guess a pairing time or raise an offline alert.
         if (typeof device.lastSeen !== 'number' || now - device.lastSeen < OFFLINE_AFTER_MS) continue;
         device.connectionStatus = 'Offline';
-        const deviceId = palm.deviceId as string;
         const alertKey = alertKeys[deviceId];
         if (alertKey) appendAlert(root, device.farmId, device.palmId, 'SensorOffline', now, alertKey);
         changed = true;

@@ -16,6 +16,7 @@ export {recordTreatment} from './treatments';
 
 export {
   sendInvitation,
+  searchFarmers,
   acceptInvitation,
   rejectInvitation,
   cancelInvitation,
@@ -26,5 +27,6 @@ export {
   deleteAccount,
   registerProfile,
   updateProfile,
+  syncVerifiedEmail,
   getMyAssignedFarm
 } from './accounts';

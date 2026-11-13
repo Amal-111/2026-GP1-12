@@ -1,5 +1,6 @@
 
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
+import {getStorage} from 'firebase-admin/storage';
 import {
   actor,
   db,
@@ -287,7 +288,6 @@ export const deleteFarm = onCall(options, async request => {
       [`farms/${farmId}`]: null,
       [`palms/${farmId}`]: null,
       [`monitoringHistory/${farmId}`]: null,
-      [`treatmentRecords/${farmId}`]: null,
       [`alerts/${farmId}`]: null,
     };
 
@@ -304,6 +304,9 @@ export const deleteFarm = onCall(options, async request => {
         updates[`monitoringDevices/${deviceId}`] = {
           connectionStatus: 'Offline',
         };
+
+        // Remove readings belonging to the released device.
+        updates[`sensorReadings/${deviceId}`] = null;
 
         // Clear the previous sensor monitoring state.
         updates[`monitoringState/${deviceId}`] = null;
@@ -344,8 +347,26 @@ export const deleteFarm = onCall(options, async request => {
       return false;
     });
 
+  
+    // Delete all images belonging to this farm.
+    const bucket = getStorage().bucket(
+      'rasd-6a036.firebasestorage.app'
+    );
+
+    const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+    for (const extension of extensions) {
+      const imagePath =
+        `farmImages/${user.uid}/${farmId}.${extension}`;
+
+      await bucket.file(imagePath).delete({
+        ignoreNotFound: true,
+      });
+    }
+
     // Apply all cleanup changes in one database update.
     await db().ref().update(updates);
+
 
     return {
       success: true,

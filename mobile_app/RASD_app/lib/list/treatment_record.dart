@@ -1,0 +1,414 @@
+// Form to record that a palm was treated (date + notes) and mark it as treated.
+
+import 'package:flutter/material.dart';
+import '../theme/glass_widgets.dart';
+import '../theme/app_colors.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import '../services/rasd_errors.dart';
+import '../data/auth_store.dart';
+/// Treatment record page.
+class TreatmentRecordPage extends StatefulWidget {
+  final String palmId;
+  final String farmId;
+  final VoidCallback? onMarkedTreated;
+  final bool showAppBar;
+
+  const TreatmentRecordPage({
+    super.key,
+    required this.palmId,
+    required this.farmId,
+    this.onMarkedTreated,
+    this.showAppBar = true,
+  });
+
+  @override
+  State<TreatmentRecordPage> createState() =>
+      _TreatmentRecordPageState();
+}
+
+class _TreatmentRecordPageState
+    extends State<TreatmentRecordPage> {
+
+  static const List<String> _treatmentMethods = [
+    'Chemical Treatment',
+    'Biological Treatment',
+    'Mechanical Treatment',
+    'Other',
+  ];
+
+  late DateTime _selectedDate;
+  String? _selectedMethod;
+  final TextEditingController _notesController =
+  TextEditingController();
+
+  /// True while saving (disables the button).
+  bool _isSaving = false;
+
+  Stream<DatabaseEvent> get _palmStream => FirebaseDatabase.instance
+      .ref('palms/${widget.farmId}/${widget.palmId}')
+      .onValue;
+
+  Stream<DatabaseEvent> get _treatmentsStream => FirebaseDatabase.instance
+      .ref('treatmentRecords/${widget.farmId}/${widget.palmId}')
+      .onValue;
+
+  List<Map<String, dynamic>> _readRecords(Object? value) {
+    if (value is! Map) return [];
+    final records = <Map<String, dynamic>>[];
+    value.forEach((key, raw) {
+      if (raw is! Map) return;
+      final data = Map<String, dynamic>.from(raw);
+      final date = DateTime.tryParse(data['treatmentDate']?.toString() ?? '');
+      if (date == null) return;
+      records.add({
+        'id': key.toString(),
+        'method': data['treatmentMethod']?.toString() ?? '',
+        'date': date,
+        'notes': data['notes']?.toString() ?? '',
+      });
+    });
+    records.sort((a, b) =>
+        (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+    return records;
+  }
+
+  /// Initializes screen state.
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+  }
+
+  /// Releases screen resources.
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  /// Formats a date as day/month/year.
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr',
+      'May', 'Jun', 'Jul', 'Aug',
+      'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
+    if (AuthStore.arabic.value) {
+      return '${date.day.toString().padLeft(2, '0')}/'
+          '${date.month.toString().padLeft(2, '0')}/${date.year}';
+    }
+    return '${date.day.toString().padLeft(2, '0')} '
+        '${months[date.month - 1]} ${date.year}';
+  }
+
+  /// Lets the user pick the treatment date.
+  Future<void> _selectDate() async {
+    final now = DateTime.now();
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: AppColors.surface,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null && mounted) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
+    }
+  }
+
+  /// Saves the treatment record and marks the palm as treated.
+  Future<void> _markAsTreated() async {
+    if (_selectedMethod == null) {
+      showCenterMessage(
+        context,
+        AuthStore.arabic.value
+            ? 'اختر طريقة علاج النخلة ثم احفظ.'
+            : 'Choose how the palm was treated, then save.',
+        success: false,
+        title: AuthStore.arabic.value
+            ? 'طريقة العلاج غير محددة'
+            : 'Treatment method is missing',
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final result = await FirebaseFunctions.instanceFor(
+        region: 'us-central1',
+      ).httpsCallable('recordTreatment').call({
+        'farmId': widget.farmId,
+        'palmId': widget.palmId,
+        'treatmentMethod': _selectedMethod!,
+        'treatmentDate':
+            '${_selectedDate.year.toString().padLeft(4, '0')}-'
+            '${_selectedDate.month.toString().padLeft(2, '0')}-'
+            '${_selectedDate.day.toString().padLeft(2, '0')}',
+        'notes': _notesController.text.trim(),
+      });
+
+      if (!mounted) return;
+      if (result.data is Map && result.data['success'] != true) {
+        throw StateError(AuthStore.arabic.value
+            ? 'تعذر حفظ العلاج. حاول مرة أخرى.'
+            : 'The treatment could not be saved. Please try again.');
+      }
+      setState(() {
+        _selectedDate = DateTime.now();
+        _selectedMethod = null;
+        _notesController.clear();
+      });
+      widget.onMarkedTreated?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AuthStore.arabic.value
+                ? 'تمت إضافة سجل العلاج بنجاح.'
+                : 'Treatment record added successfully.',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } catch (e) {
+      // RasdErrors turns Firebase and other errors into a clear message.
+      if (!mounted) return;
+      showRasdError(
+        context,
+        e,
+        title: AuthStore.arabic.value
+            ? 'تعذر حفظ العلاج'
+            : 'Could not save the treatment',
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+/// Builds the page with localized labels.
+@override
+Widget build(BuildContext context) {
+return ValueListenableBuilder<bool>(
+valueListenable: AuthStore.arabic,
+builder: (context, isArabic, child) {
+  return Scaffold(
+    appBar: widget.showAppBar
+        ? AppBar(
+      title: Text(
+        isArabic ? 'سجل العلاج' : 'Treatment Record',
+      ),
+      centerTitle: true,
+    )
+        : null,
+    body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            20, 12, 20, 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child:GlassLabel(child: Text(
+isArabic
+? 'العلاج  •  ${widget.palmId}'
+: 'Treatment  •  ${widget.palmId}',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge,
+              )),),
+              const SizedBox(height: 20),
+
+              // Treatment form
+              StreamBuilder<DatabaseEvent>(
+                stream: _palmStream,
+                builder: (context, palmSnapshot) {
+                  final palmData = palmSnapshot.data?.snapshot.value;
+                  final healthStatus = palmData is Map
+                      ? palmData['healthStatus']?.toString().trim()
+                      : null;
+                  final canTreat = !palmSnapshot.hasError &&
+                      healthStatus == 'Suspected';
+
+                  return AbsorbPointer(
+                    absorbing: !canTreat || _isSaving,
+                    child: GlassCard(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      Text(
+isArabic ? 'تسجيل العلاج' : 'Mark as Treated',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+isArabic
+? 'سجّل العلاج بعد فحص النخلة.'
+: 'Record treatment after inspecting the palm.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Treatment date
+                      Text(
+isArabic ? 'تاريخ العلاج' : 'Treatment Date',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: _selectDate,
+                        borderRadius:
+                        BorderRadius.circular(12),
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(
+                              Icons.calendar_month_rounded,
+                            ),
+                            suffixIcon: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                            ),
+                          ),
+                          child: Text(
+                            _formatDate(_selectedDate),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Treatment method
+                      Text(
+isArabic ? 'طريقة العلاج' : 'Treatment Method',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _selectedMethod,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+hintText: isArabic ? 'اختر طريقة العلاج' : 'Select method',
+                          prefixIcon: const Icon(
+                            Icons.science_outlined,
+                          ),
+                        ),
+                        items: _treatmentMethods.map((method) {
+                          return DropdownMenuItem<String>(
+                            value: method,
+                            child: Text(
+                              isArabic
+                                  ? (method == 'Chemical Treatment'
+                                  ? 'علاج كيميائي'
+                                  : method == 'Biological Treatment'
+                                  ? 'علاج بيولوجي'
+                                  : method == 'Mechanical Treatment'
+                                  ? 'علاج ميكانيكي'
+                                  : 'أخرى')
+                                  : method,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedMethod = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Optional notes
+                      Text(
+isArabic ? 'ملاحظات (اختياري)' : 'Notes (optional)',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _notesController,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+hintText: isArabic ? 'أضف أي ملاحظات...' : 'Add any notes...',
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Submit treatment
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: (_isSaving || !canTreat)
+                              ? null
+                              : _markAsTreated,
+                          icon: const Icon(
+                            Icons.check_circle_outline_rounded,
+                          ),
+                          label: Text(
+                            isArabic ? 'تسجيل العلاج' : 'Mark as Treated',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                    ),
+                  );
+                },
+              ),
+
+            ],
+          ),
+        ),
+      ),
+);
+},
+);
+}
+}

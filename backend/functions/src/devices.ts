@@ -16,7 +16,14 @@ export const connectDevice = onCall(options, async (request) => {
     const farm = root?.farms?.[farmId];
     const palm = root?.palms?.[farmId]?.[palmId];
     if (!farm || farm.deleting || !palm || palm.deviceId) return;
-    if (user.role === 'FarmOwner' ? farm.ownerId !== user.uid : user.farmId !== farmId) return;
+    // Recheck current membership inside the transaction. The farmer may have
+    // been removed after the initial farmAccess() lookup.
+    const allowed = user.role === 'FarmOwner'
+      ? (root.users?.[user.uid]?.role === 'FarmOwner' && farm.ownerId === user.uid)
+      : (user.role === 'Farmer' &&
+         root.users?.[user.uid]?.role === 'Farmer' &&
+         root.users[user.uid].farmId === farmId);
+    if (!allowed) return;
     root.monitoringDevices ??= {};
     const existing = root.monitoringDevices[deviceId];
     if (existing && (existing.farmId || existing.palmId)) return;

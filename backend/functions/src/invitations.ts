@@ -42,7 +42,88 @@ function isPendingForFarmer(
 }
 
 // =====================================================
-// 1. SEND INVITATION
+// 1. SEARCH FARMERS BY NAME
+// =====================================================
+
+export const searchFarmers = onCall(options, async request => {
+  const user = await actor(request);
+
+  if (user.role !== 'FarmOwner') {
+    throw new HttpsError(
+      'permission-denied',
+      'Only farm owners can search for farmers.'
+    );
+  }
+
+  const data = object(request.data);
+  const farmId = id(data.farmId, 'farmId');
+  const query = stringField(data.name, 'name', 80);
+
+  if (query.length < 2) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Enter at least two characters.'
+    );
+  }
+
+  // Verify that the requesting user owns this farm.
+  const farmSnapshot = await db()
+    .ref(`farms/${farmId}`)
+    .get();
+
+  const farm = asMap(farmSnapshot.val());
+
+  if (
+    !farm ||
+    farm.ownerId !== user.uid ||
+    farm.deleting === true
+  ) {
+    throw new HttpsError(
+      'permission-denied',
+      'You do not have access to this farm.'
+    );
+  }
+
+  // Search using the beginning of fullName.
+  // Results are deliberately limited.
+  const snapshot = await db()
+    .ref('users')
+    .orderByChild('fullName')
+    .startAt(query)
+    .endAt(query + '\uf8ff')
+    .limitToFirst(50)
+    .get();
+
+  const farmers: Array<{
+    farmerId: string;
+    fullName: string;
+  }> = [];
+
+  snapshot.forEach(child => {
+    const farmer = asMap(child.val());
+
+    if (
+      child.key &&
+      farmer?.role === 'Farmer' &&
+      !isAssigned(farmer.farmId)
+    ) {
+      farmers.push({
+        farmerId: child.key,
+        fullName: String(farmer.fullName ?? ''),
+      });
+    }
+
+    // Stop after finding ten available farmers.
+    return farmers.length >= 10;
+  });
+
+  return {
+    farmers,
+  };
+});
+
+// =====================================================
+// 2. SEND INVITATION
 // =====================================================
 
 export const sendInvitation = onCall(options, async request => {
@@ -57,35 +138,13 @@ export const sendInvitation = onCall(options, async request => {
 
   const data = object(request.data);
   const farmId = id(data.farmId, 'farmId');
-  const email = stringField(data.email, 'email', 254)
-    .trim()
-    .toLowerCase();
 
-  let farmerId: string;
-
-  try {
-    farmerId = (await getAuth().getUserByEmail(email)).uid;
-  } catch (error: any) {
-    if (error?.code === 'auth/user-not-found') {
-      throw new HttpsError(
-        'not-found',
-        'Farmer account not found.'
-      );
-    }
-
-    throw new HttpsError(
-      'internal',
-      'Unable to look up farmer account.'
-    );
-  }
-
-  const [farmSnapshot, farmerSnapshot] = await Promise.all([
-    db().ref(`farms/${farmId}`).get(),
-    db().ref(`users/${farmerId}`).get(),
-  ]);
+  // Verify farm ownership before looking up the target farmer.
+  const farmSnapshot = await db()
+    .ref(`farms/${farmId}`)
+    .get();
 
   const farm = asMap(farmSnapshot.val());
-  const farmer = asMap(farmerSnapshot.val());
 
   if (
     !farm ||
@@ -97,6 +156,41 @@ export const sendInvitation = onCall(options, async request => {
       'Farm is unavailable or not owned by this account.'
     );
   }
+
+  let farmerId: string;
+
+  if (data.farmerId !== undefined) {
+    // New flow: select a farmer from name search results.
+    farmerId = id(data.farmerId, 'farmerId');
+  } else {
+    // Legacy flow: invite using a registered email address.
+    const email = stringField(data.email, 'email', 254)
+      .trim()
+      .toLowerCase();
+
+    try {
+      farmerId = (await getAuth().getUserByEmail(email)).uid;
+    } catch (error: any) {
+      if (error?.code === 'auth/user-not-found') {
+        throw new HttpsError(
+          'not-found',
+          'Farmer account not found.'
+        );
+      }
+
+      throw new HttpsError(
+        'internal',
+        'Unable to look up farmer account.'
+      );
+    }
+  }
+
+  // Verify the selected account and its assignment status.
+  const farmerSnapshot = await db()
+    .ref(`users/${farmerId}`)
+    .get();
+
+  const farmer = asMap(farmerSnapshot.val());
 
   if (!farmer || farmer.role !== 'Farmer') {
     throw new HttpsError(
@@ -159,7 +253,7 @@ export const sendInvitation = onCall(options, async request => {
 });
 
 // =====================================================
-// 2. ACCEPT INVITATION
+// 3. ACCEPT INVITATION
 // =====================================================
 
 export const acceptInvitation = onCall(options, async request => {
@@ -284,7 +378,7 @@ export const acceptInvitation = onCall(options, async request => {
 });
 
 // =====================================================
-// 3. REJECT INVITATION
+// 4. REJECT INVITATION
 // =====================================================
 
 export const rejectInvitation = onCall(options, async request => {
@@ -356,7 +450,7 @@ export const rejectInvitation = onCall(options, async request => {
 });
 
 // =====================================================
-// 4. CANCEL INVITATION (FARM OWNER)
+// 5. CANCEL INVITATION (FARM OWNER)
 // =====================================================
 
 export const cancelInvitation = onCall(options, async request => {
@@ -447,7 +541,7 @@ export const cancelInvitation = onCall(options, async request => {
 });
 
 // =====================================================
-// 5. REMOVE FARMER (FARM OWNER)
+// 6. REMOVE FARMER (FARM OWNER)
 // =====================================================
 
 export const removeFarmer = onCall(options, async request => {
@@ -544,6 +638,10 @@ export const removeFarmer = onCall(options, async request => {
   return {success: true};
 });
 
+// =====================================================
+// 7. GET INVITATION DETAILS
+// =====================================================
+
 export const getInvitationDetails = onCall(options, async request => {
   const user = await actor(request);
 
@@ -614,6 +712,7 @@ export const getInvitationDetails = onCall(options, async request => {
   return {
     farmName: String(farm.farmName ?? 'Unknown Farm'),
     ownerName: String(owner?.fullName ?? 'Unknown Owner'),
+    farmerName: String(farmer?.fullName ?? 'Unknown Farmer'),
     farmerEmail: String(farmer?.email ?? 'Unknown Farmer'),
   };
 });
