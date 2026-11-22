@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'palm_store.dart';
-import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
 import 'farm_location_picker.dart';
 import 'connect_sensor_page.dart';
@@ -18,7 +17,6 @@ class AddPalmPage extends StatefulWidget {
 }
 
 class _AddPalmPageState extends State<AddPalmPage> {
-  final PalmStore _store = PalmStore.instance;
 
   final _infoFormKey = GlobalKey<FormState>();
   final _locationFormKey = GlobalKey<FormState>();
@@ -38,16 +36,6 @@ class _AddPalmPageState extends State<AddPalmPage> {
     _latController.dispose();
     _lngController.dispose();
     super.dispose();
-  }
-
-  /// Fills the location with the device's current position.
-  void _useCurrentLocation() {
-    // TODO: get the real GPS location with the "geolocator" package.
-    // For now it fills a sample location in the farm.
-    setState(() {
-      _latController.text = '24.7136';
-      _lngController.text = '46.6753';
-    });
   }
 
   /// Validates the current step and moves forward (or saves on the last step).
@@ -223,23 +211,13 @@ Widget _buildLocationStep(bool isArabic) {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FarmLocationPicker(
+            showCurrentLocation: true,
             latitude: double.tryParse(_latController.text.trim()),
             longitude: double.tryParse(_lngController.text.trim()),
             onPicked: (point) => setState(() {
               _latController.text = '${point.latitude}';
               _lngController.text = '${point.longitude}';
             }),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _useCurrentLocation,
-            icon: const Icon(Icons.my_location_rounded),
-label: Text(
-isArabic ? 'استخدم موقعي الحالي' : 'Use Current Location',
-),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-            ),
           ),
           const SizedBox(height: 18),
           // The numbers update when the map is tapped, and typing

@@ -1,6 +1,5 @@
 
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
-import {getStorage} from 'firebase-admin/storage';
 import {
   actor,
   db,
@@ -11,6 +10,8 @@ import {
   coord,
   integer,
   optionalFarmImage,
+  deleteFarmImages,
+  prepareFarmPhotoCleanup,
 } from './common';
 
 const options = {
@@ -186,42 +187,55 @@ export const updateFarm = onCall(options, async request => {
   }
 
   const farmRef = db().ref(`farms/${farmId}`);
+  const changesPhoto = 'farmImage' in changes;
+  let previousPhoto: unknown;
+  let cleanupPhoto: Awaited<ReturnType<typeof prepareFarmPhotoCleanup>>;
+  if (changesPhoto) {
+    const farm = (await farmRef.get()).val();
+    if (!farm || farm.ownerId !== user.uid || farm.deleting === true) {
+      throw new HttpsError('permission-denied', 'Farm is unavailable or not owned by this account.');
+    }
+    previousPhoto = farm.farmImage ?? null;
+    cleanupPhoto = await prepareFarmPhotoCleanup(user.uid, farmId, previousPhoto, changes.farmImage);
+  }
 
-  const [farmSnapshot, palmsSnapshot] = await Promise.all([
-    farmRef.get(),
-    db().ref(`palms/${farmId}`).get(),
-  ]);
-
-  const farm = asMap(farmSnapshot.val());
-
-  if (
-    !farm ||
-    farm.ownerId !== user.uid ||
-    farm.deleting === true
-  ) {
+  let reason: 'unavailable' | 'capacity' | 'photo-changed' | undefined;
+  const tx = await farmRef.transaction(current => {
+    reason = undefined;
+    const farm = asMap(current);
+    if (!farm || farm.ownerId !== user.uid || farm.deleting === true) {
+      reason = 'unavailable';
+      // Allow the conditional write to resolve a cold-cache null.
+      return current === null ? null : undefined;
+    }
+    const registeredPalms = Object.keys(asMap(farm.palms) ?? {}).length;
+    if ('totalPalms' in changes && changes.totalPalms < registeredPalms) {
+      reason = 'capacity';
+      return;
+    }
+    if (changesPhoto && (farm.farmImage ?? null) !== previousPhoto) {
+      reason = 'photo-changed';
+      return;
+    }
+    return {...farm, ...changes};
+  }, undefined, false);
+  if (reason === 'capacity') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Farm capacity cannot be less than registered palms.'
+    );
+  }
+  if (reason === 'photo-changed') {
+    throw new HttpsError('aborted', 'The farm photo changed. Reopen Farm Settings and retry.');
+  }
+  if (!tx.committed || reason === 'unavailable') {
     throw new HttpsError(
       'permission-denied',
       'Farm is unavailable or not owned by this account.'
     );
   }
 
-  const palms = asMap(palmsSnapshot.val()) ?? {};
-  const registeredPalms = Object.keys(palms).length;
-
-  if (
-    'totalPalms' in changes &&
-    changes.totalPalms < registeredPalms
-  ) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Farm capacity cannot be less than registered palms.'
-    );
-  }
-
-  // Update only the requested fields.
-  // This avoids a transaction on the database root.
-  await farmRef.update(changes);
-
+  await cleanupPhoto?.();
   return {
     success: true,
   };
@@ -274,95 +288,40 @@ export const deleteFarm = onCall(options, async request => {
 
 
   try {
-    const [
-      devicesSnapshot,
-      usersSnapshot,
-      invitationsSnapshot,
-    ] = await Promise.all([
-      db().ref('monitoringDevices').get(),
-      db().ref('users').get(),
-      db().ref('farmInvitations').get(),
-    ]);
-
-    const updates: DataMap = {
-      [`farms/${farmId}`]: null,
-      [`palms/${farmId}`]: null,
-      [`monitoringHistory/${farmId}`]: null,
-      [`alerts/${farmId}`]: null,
-    };
-
-    // Disconnect devices associated with the deleted farm.
-    
-    // Release devices associated with the deleted farm.
-    devicesSnapshot.forEach(snapshot => {
-      const device = asMap(snapshot.val());
-
-      if (device?.farmId === farmId && snapshot.key) {
-        const deviceId = snapshot.key;
-
-        // Remove the old farm and palm assignment.
-        updates[`monitoringDevices/${deviceId}`] = {
-          connectionStatus: 'Offline',
-        };
-
-        // Remove readings belonging to the released device.
-        updates[`sensorReadings/${deviceId}`] = null;
-
-        // Clear the previous sensor monitoring state.
-        updates[`monitoringState/${deviceId}`] = null;
+    const usersSnapshot = await db().ref('users').get();
+    const updates: DataMap = {[`farms/${farmId}`]: null};
+    // Release only the device pairings under this farm.
+    const palms = asMap(farm.palms) ?? {};
+    for (const palm of Object.values(palms)) {
+      const deviceId = asMap(palm)?.deviceId;
+      if (typeof deviceId === 'string') {
+        const state = (await db().ref(`monitoringState/${deviceId}`).get()).val();
+        if (state?.farmId === farmId) updates[`monitoringState/${deviceId}`] = null;
       }
-
-      return false;
-    });
-
-
-    // Unassign all farmers belonging to this farm.
+    }
     usersSnapshot.forEach(snapshot => {
       const account = asMap(snapshot.val());
-
-      if (
-        account?.role === 'Farmer' &&
-        account.farmId === farmId &&
-        snapshot.key
-      ) {
+      if (!snapshot.key || !account) return false;
+      if (account.role === 'Farmer' && account.farmId === farmId) {
         updates[`users/${snapshot.key}/farmId`] = null;
       }
-
-      return false;
-    });
-
-    // Remove all pending invitations for this farm.
-    invitationsSnapshot.forEach(snapshot => {
-      const invitation = asMap(snapshot.val());
-
-      if (
-        invitation?.farmId === farmId &&
-        snapshot.key
-      ) {
-        updates[
-          `farmInvitations/${snapshot.key}`
-        ] = null;
+      const invitations = asMap(account.farmInvitations) ?? {};
+      for (const [inviteId, invite] of Object.entries(invitations)) {
+        if (asMap(invite)?.farmId === farmId) {
+          updates[`users/${snapshot.key}/farmInvitations/${inviteId}`] = null;
+        }
       }
-
+      const sent = asMap(account.sentFarmInvitations) ?? {};
+      for (const [inviteId, invite] of Object.entries(sent)) {
+        if (asMap(invite)?.farmId === farmId) {
+          updates[`users/${snapshot.key}/sentFarmInvitations/${inviteId}`] = null;
+        }
+      }
       return false;
     });
 
-  
     // Delete all images belonging to this farm.
-    const bucket = getStorage().bucket(
-      'rasd-6a036.firebasestorage.app'
-    );
-
-    const extensions = ['jpg', 'jpeg', 'png', 'webp'];
-
-    for (const extension of extensions) {
-      const imagePath =
-        `farmImages/${user.uid}/${farmId}.${extension}`;
-
-      await bucket.file(imagePath).delete({
-        ignoreNotFound: true,
-      });
-    }
+    await deleteFarmImages(user.uid, farmId);
 
     // Apply all cleanup changes in one database update.
     await db().ref().update(updates);

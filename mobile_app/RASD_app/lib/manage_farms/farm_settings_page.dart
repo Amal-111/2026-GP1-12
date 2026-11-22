@@ -12,7 +12,9 @@ import '../theme/glass_widgets.dart';
 import '../data/auth_store.dart';
 /// Farm settings page.
 class FarmSettingsPage extends StatefulWidget {
-  const FarmSettingsPage({super.key});
+  const FarmSettingsPage({super.key, required this.farm});
+
+  final RasdFarm farm;
 
   @override
   State<FarmSettingsPage> createState() => _FarmSettingsPageState();
@@ -40,7 +42,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
   void initState() {
     super.initState();
 
-    final farm = MockData.selectedFarm;
+    final farm = widget.farm;
 
     _nameController = TextEditingController(
       text: farm.name,
@@ -131,6 +133,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     try {
       // 1. Save name, description and location.
       await RasdManagementService.updateFarm(
+        farmId: widget.farm.id,
         name: name,
         description: _descriptionController.text.trim(),
         latitude: _latitude!,
@@ -141,7 +144,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
       final photoChanged = _imagePath != _savedImagePath;
       if (photoChanged) {
         try {
-          final farmId = RasdManagementService.farmId;
+          final farmId = widget.farm.id;
           final imageUrl = _imagePath.isEmpty
               ? ''
               : await RasdFarmsService.uploadFarmImage(
@@ -153,23 +156,8 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
             imageUrl: imageUrl,
           );
 
-// Save the previous URL before updating local state.
-          final previousImageUrl = _savedImagePath;
-
           _savedImagePath = imageUrl;
           _imagePath = imageUrl;
-
-// Remove the old Storage file only after
-// the new image URL has been saved successfully.
-          try {
-            await RasdFarmsService.deletePreviousFarmImage(
-              farmId: farmId,
-              previousImageUrl: previousImageUrl,
-              newImageUrl: imageUrl,
-            );
-          } catch (cleanupError) {
-            debugPrint('Old farm image cleanup failed: $cleanupError');
-          }
         } catch (error) {
           // The details were saved; only the photo failed.
           if (!mounted) return;
@@ -208,7 +196,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
   /// Asks for confirmation, then deletes the farm.
   Future<void> _confirmDeleteFarm() async {
-    final farm = MockData.selectedFarm;
+    final farm = widget.farm;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -250,7 +238,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await RasdManagementService.deleteFarm();
+      await RasdManagementService.deleteFarm(widget.farm.id);
     } catch (error) {
       if (mounted) {
         showRasdError(
@@ -393,9 +381,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
                                                 6)}, '
                                                 '${_longitude!.toStringAsFixed(
                                                 6)}'
-                                                : MockData
-                                                .selectedFarm
-                                                .location,
+                                                : widget.farm.location,
                                             style:
                                             Theme
                                                 .of(context)
@@ -535,6 +521,7 @@ title: isArabic ? 'موقع المزرعة' : 'Farm Location',
             children: [
               Expanded(
                 child: FarmLocationPicker(
+                  showCurrentLocation: true,
                   latitude: _latitude,
                   longitude: _longitude,
                   pinIcon:

@@ -6,6 +6,7 @@ import '../theme/palm_icon.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/glass_widgets.dart';
@@ -33,7 +34,6 @@ class _FarmMapPageState extends State<FarmMapPage> {
   final FirebaseDatabase _db = FirebaseDatabase.instance;
   StreamSubscription<DatabaseEvent>? _palmsSubscription;
   StreamSubscription<DatabaseEvent>? _farmSubscription;
-  StreamSubscription<DatabaseEvent>? _devicesSubscription;
   List<MapPalm> _palms = [];
   Map<String, dynamic> _devices = {};
   String _farmName = 'Farm Map';
@@ -92,7 +92,6 @@ class _FarmMapPageState extends State<FarmMapPage> {
   void _watchFarm() {
     _palmsSubscription?.cancel();
     _farmSubscription?.cancel();
-    _devicesSubscription?.cancel();
     _palms = [];
     _devices = {};
     _loadedPalms = false;
@@ -118,14 +117,17 @@ class _FarmMapPageState extends State<FarmMapPage> {
       }
     });
 
-    _devicesSubscription = _db.ref('monitoringDevices').onValue.listen((event) {
-      if (!mounted) return;
-      setState(() => _devices = _asMap(event.snapshot.value));
-      _refreshPalmStatuses();
-    });
 
-    _palmsSubscription = _db.ref('palms/$farmId').onValue.listen((event) {
+    _palmsSubscription = _db.ref('farms/$farmId/palms').onValue.listen((event) {
       final value = _asMap(event.snapshot.value);
+      // Device status is embedded alongside each palm, not in a global node.
+      final devices = <String, dynamic>{};
+      for (final entry in value.entries) {
+        final palm = _asMap(entry.value);
+        final deviceId = (palm['deviceId'] ?? '').toString();
+        final device = _asMap(palm['monitoringDevice']);
+        if (deviceId.isNotEmpty && device.isNotEmpty) devices[deviceId] = device;
+      }
       final used = <String, int>{};
       final result = <MapPalm>[];
       for (final entry in value.entries) {
@@ -141,12 +143,14 @@ class _FarmMapPageState extends State<FarmMapPage> {
           status: _status(data['healthStatus']),
           deviceId: (data['deviceId'] ?? '').toString(),
           point: LatLng(lat + repeat * 0.00004, lng + repeat * 0.00004),
+          destination: LatLng(lat, lng),
         ));
       }
       if (!mounted) return;
       final wasLoaded = _loadedPalms;
       setState(() {
         _palms = result;
+        _devices = devices;
         _loadedPalms = true;
         if (selectedPalm != null) {
           for (final palm in result) {
@@ -201,7 +205,6 @@ class _FarmMapPageState extends State<FarmMapPage> {
   void dispose() {
     _palmsSubscription?.cancel();
     _farmSubscription?.cancel();
-    _devicesSubscription?.cancel();
     super.dispose();
   }
 
@@ -232,6 +235,22 @@ class _FarmMapPageState extends State<FarmMapPage> {
         builder: (_) => PalmDetailsPage(farmId: activeFarmId, palmId: palm.id),
       ),
     );
+  }
+
+  Future<void> _openDirections(MapPalm palm) async {
+    final url = palm.directionsUrl;
+    if (url == null) {
+      _locationMessage('إحداثيات النخلة غير متاحة أو غير صالحة.',
+          'This palm has no valid location for directions.');
+      return;
+    }
+    try {
+      if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // The device may have no application that can open the link.
+    }
+    _locationMessage('تعذّر فتح خرائط Google.',
+        'Could not open Google Maps directions.');
   }
 
   /// Moves the map so all palms of the farm can be seen.
@@ -351,7 +370,7 @@ farmName == 'Farm Map'
                     minZoom: 3,
                     maxZoom: 19,
                     // Tap on an empty place closes the palm card.
-                    onTap: (_, __) => setState(() => selectedPalm = null),
+                    onTap: (_, _) => setState(() => selectedPalm = null),
                   ),
                   children: [
                     RasdMap.tiles(satellite: _satellite),
@@ -453,6 +472,7 @@ color: statusColor(selectedPalm!.displayStatus),
 isArabic: isArabic,
 onClose: () => setState(() => selectedPalm = null),
 onViewDetails: () => openPalmDetails(selectedPalm!),
+onDirections: () => _openDirections(selectedPalm!),
 ),
                   ),
 
@@ -481,6 +501,22 @@ class MapPalm {
   final String id;
   final String status;
   final LatLng point;
+  final LatLng? destination;
+
+  Uri? get directionsUrl {
+    final location = destination;
+    if (location == null) return null;
+    final lat = location.latitude;
+    final lng = location.longitude;
+    if (!lat.isFinite || !lng.isFinite || lat.abs() > 90 || lng.abs() > 180) {
+      return null;
+    }
+    return Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': '$lat,$lng',
+      'dir_action': 'navigate',
+    });
+  }
   final String deviceId;
   final String? displayStatusOverride;
 
@@ -488,6 +524,7 @@ class MapPalm {
 
   MapPalm copyWith({String? displayStatus}) => MapPalm(
     id: id, status: status, deviceId: deviceId, point: point,
+    destination: destination,
     displayStatusOverride: displayStatus,
   );
 
@@ -495,6 +532,7 @@ class MapPalm {
     required this.id,
     required this.status,
     required this.point,
+    this.destination,
     required this.deviceId,
     this.displayStatusOverride,
   });
@@ -543,6 +581,7 @@ class _PalmInfoCard extends StatelessWidget {
   final Color color;
   final VoidCallback onClose;
   final VoidCallback onViewDetails;
+  final VoidCallback onDirections;
 final bool isArabic;
 
   const _PalmInfoCard({
@@ -550,6 +589,7 @@ final bool isArabic;
     required this.color,
     required this.onClose,
     required this.onViewDetails,
+    required this.onDirections,
     required this.isArabic,
   });
 
@@ -612,6 +652,17 @@ tooltip: isArabic ? 'إغلاق' : 'Close',
                 onPressed: onViewDetails,
                 icon: const Icon(Icons.arrow_forward_rounded),
 label: Text(isArabic ? 'عرض تفاصيل النخلة' : 'View Palm Details'),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onDirections,
+                icon: const Icon(Icons.directions_outlined),
+                label: Text(isArabic ? 'الاتجاهات' : 'Directions'),
               ),
             ),
           ),

@@ -42,7 +42,7 @@ isArabic ? 'لا توجد دعوات معلقة' : 'No pending invitations',
           return ListView.separated(
             padding: const EdgeInsets.all(20),
             itemCount: invitations.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final invitation = invitations[index];
               return GlassBox(child: Row(children: [
@@ -102,7 +102,14 @@ isArabic
                   ),
 
                 ),
-      TextButton(
+      if (invitation['status'] == 'rejected')
+        TextButton(
+          onPressed: null,
+          style: TextButton.styleFrom(disabledForegroundColor: Colors.red),
+          child: Text(isArabic ? 'مرفوضة' : 'Rejected'),
+        )
+      else
+        TextButton(
           onPressed: () async {
             final confirmed = await showDialog<bool>(
               context: context,

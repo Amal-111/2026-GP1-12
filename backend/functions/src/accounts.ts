@@ -1,6 +1,6 @@
 import {getAuth} from 'firebase-admin/auth';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
-import {actor, db, object, stringField} from './common';
+import {actor, db, deleteFarmImages, object, stringField} from './common';
 
 const options = {region: 'us-central1', maxInstances: 10};
 
@@ -27,14 +27,10 @@ export const deleteAccount = onCall(options, async request => {
   // Read the data required for account cleanup.
   const [
     farmsSnapshot,
-    devicesSnapshot,
     usersSnapshot,
-    invitationsSnapshot,
   ] = await Promise.all([
     database.ref('farms').get(),
-    database.ref('monitoringDevices').get(),
     database.ref('users').get(),
-    database.ref('farmInvitations').get(),
   ]);
 
   const updates: Record<string, unknown> = {};
@@ -55,31 +51,17 @@ export const deleteAccount = onCall(options, async request => {
   // Remove each owned farm and its related records.
   for (const farmId of ownedFarmIds) {
     updates[`farms/${farmId}`] = null;
-    updates[`palms/${farmId}`] = null;
-    updates[`monitoringHistory/${farmId}`] = null;
-    updates[`alerts/${farmId}`] = null;
   }
 
-  // Release devices belonging to deleted farms.
-  devicesSnapshot.forEach(snapshot => {
-    const device = snapshot.val();
-
-    if (
-      snapshot.key &&
-      device?.farmId &&
-      ownedFarms.has(device.farmId)
-    ) {
-      const deviceId = snapshot.key;
-
-      updates[`monitoringDevices/${deviceId}`] = {
-        connectionStatus: 'Offline',
-      };
-
-      // The released device no longer owns historical sensor samples.
-      updates[`sensorReadings/${deviceId}`] = null;
-      updates[`monitoringState/${deviceId}`] = null;
+  // Release internal device-to-palm links for deleted farms.
+  farmsSnapshot.forEach(snapshot => {
+    if (!snapshot.key || !ownedFarms.has(snapshot.key)) return false;
+    const palms = snapshot.val()?.palms ?? {};
+    for (const palm of Object.values(palms) as any[]) {
+      if (typeof palm?.deviceId === 'string') {
+        updates[`monitoringState/${palm.deviceId}`] = null;
+      }
     }
-
     return false;
   });
 
@@ -100,27 +82,29 @@ export const deleteAccount = onCall(options, async request => {
     return false;
   });
 
-  // Remove invitations belonging to the user or deleted farms.
-  invitationsSnapshot.forEach(snapshot => {
-    const invitation = snapshot.val();
-
-    if (
-      snapshot.key &&
-      (
-        invitation?.farmerId === user.uid ||
-        (
-          invitation?.farmId &&
-          ownedFarms.has(invitation.farmId)
-        )
-      )
-    ) {
-      updates[`farmInvitations/${snapshot.key}`] = null;
+  // Embedded invitations belong to each invited user.
+  usersSnapshot.forEach(snapshot => {
+    if (!snapshot.key) return false;
+    const invitations = snapshot.val()?.farmInvitations ?? {};
+    for (const [inviteId, invitation] of Object.entries(invitations) as [string, any][]) {
+      if (snapshot.key === user.uid || invitation?.farmerId === user.uid || ownedFarms.has(invitation?.farmId)) {
+        updates[`users/${snapshot.key}/farmInvitations/${inviteId}`] = null;
+      }
     }
-
+    const sent = snapshot.val()?.sentFarmInvitations ?? {};
+    for (const [inviteId, invitation] of Object.entries(sent) as [string, any][]) {
+      if (snapshot.key === user.uid || invitation?.farmerId === user.uid || ownedFarms.has(invitation?.farmId)) {
+        updates[`users/${snapshot.key}/sentFarmInvitations/${inviteId}`] = null;
+      }
+    }
     return false;
   });
 
   try {
+    for (const farmId of ownedFarmIds) {
+      await deleteFarmImages(user.uid, farmId);
+    }
+
     // Clean up related data, but preserve the user's profile.
     if (Object.keys(updates).length > 0) {
       await database.ref().update(updates);

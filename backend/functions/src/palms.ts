@@ -182,7 +182,7 @@ export const addPalm = onCall(options, async (request) => {
       throw new HttpsError('permission-denied', 'No access to this farm.');
     }
 
-    const existingDevice = root.monitoringDevices?.[deviceId];
+    const existingDevice = root.monitoringState?.[deviceId];
 
     if (existingDevice && (existingDevice.farmId || existingDevice.palmId)) {
       throw new HttpsError(
@@ -191,7 +191,7 @@ export const addPalm = onCall(options, async (request) => {
       );
     }
 
-    const registeredPalms = Object.keys(root.palms?.[farmId] ?? {}).length;
+    const registeredPalms = Object.keys(farm.palms ?? {}).length;
     const capacity = farm.totalPalms;
 
     if (!Number.isSafeInteger(capacity) || capacity <= 0) {
@@ -210,30 +210,23 @@ export const addPalm = onCall(options, async (request) => {
 
     const palmId = `P${String(nextNumber).padStart(3, '0')}`;
 
-    if (root.palms?.[farmId]?.[palmId]) {
+    if (farm.palms?.[palmId]) {
       throw new HttpsError('failed-precondition', 'Unable to add palm: palm-id-conflict.');
     }
 
     // Prepare all linked changes in the same conditional write.
-    root.palms ??= {};
-    root.palms[farmId] ??= {};
-    root.palms[farmId][palmId] = {
+    farm.palms ??= {};
+    farm.palms[palmId] = {
       ...fields,
       deviceId,
       healthStatus: 'Healthy',
     };
 
-    root.monitoringDevices ??= {};
-    root.monitoringDevices[deviceId] = {
-      ...(existingDevice ?? {}),
-      farmId,
-      palmId,
-      connectionStatus: 'Offline',
+    farm.palms[palmId].monitoringDevice = {
+      deviceId, farmId, palmId, connectionStatus: 'Offline',
     };
-
-    if (root.monitoringState) {
-      delete root.monitoringState[deviceId];
-    }
+    root.monitoringState ??= {};
+    root.monitoringState[deviceId] = {farmId, palmId};
 
     farm.lastPalmNumber = nextNumber;
 
@@ -342,23 +335,21 @@ export const updatePalm = onCall(options, async (request) => {
   }
 
   const palmRef = db().ref(
-    `palms/${farmId}/${palmId}`
+    `farms/${farmId}/palms/${palmId}`
   );
 
-  const existing = await palmRef.get();
-
-  if (!existing.exists()) {
+  const tx = await palmRef.transaction(current => {
+    // A cold cache may be empty. A server-confirmed null is a no-op.
+    if (current === null) return null;
+    if (typeof current !== 'object' || Array.isArray(current)) return;
+    return {...current, ...patch};
+  }, undefined, false);
+  if (!tx.committed || !tx.snapshot.exists()) {
     throw new HttpsError(
       'not-found',
       'Palm not found.'
     );
   }
-
-  // This avoids the initial-null transaction issue.
-  // However, a concurrent deletion could occur after
-  // the existence check, so this is not a final
-  // concurrency-safe implementation.
-  await palmRef.update(patch);
 
   return {success: true};
 });
@@ -395,7 +386,7 @@ export const deletePalm = onCall(options, async (request) => {
   }
 
   const palmSnapshot = await db()
-    .ref(`palms/${farmId}/${palmId}`)
+    .ref(`farms/${farmId}/palms/${palmId}`)
     .get();
 
   if (!palmSnapshot.exists()) {
@@ -409,42 +400,15 @@ export const deletePalm = onCall(options, async (request) => {
   const deviceId = palm.deviceId;
 
   const updates: Record<string, unknown> = {
-    [`palms/${farmId}/${palmId}`]: null,
-    [`monitoringHistory/${farmId}/${palmId}`]: null,
+    [`farms/${farmId}/palms/${palmId}`]: null,
   };
-
+  // Preserve the global internal index while removing the deleted pairing.
   if (deviceId) {
-    const deviceSnapshot = await db()
-      .ref(`monitoringDevices/${deviceId}`)
-      .get();
-
-    const device = deviceSnapshot.val();
-
-    if (
-      device &&
-      device.farmId === farmId &&
-      device.palmId === palmId
-    ) {
-      updates[`monitoringDevices/${deviceId}`] = {
-        connectionStatus: 'Offline',
-      };
-
-      // Remove readings associated with this released device.
-      updates[`sensorReadings/${deviceId}`] = null;
+    const state = (await db().ref(`monitoringState/${deviceId}`).get()).val();
+    if (state?.farmId === farmId && state?.palmId === palmId) {
       updates[`monitoringState/${deviceId}`] = null;
     }
   }
-
-  const alertsSnapshot = await db()
-    .ref(`alerts/${farmId}`)
-    .get();
-
-  alertsSnapshot.forEach((child) => {
-    if (child.val()?.palmId === palmId) {
-      updates[`alerts/${farmId}/${child.key}`] = null;
-    }
-  });
-
   await db().ref().update(updates);
 
   return {success: true};

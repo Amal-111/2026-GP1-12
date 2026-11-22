@@ -40,7 +40,7 @@ class RasdManagementService {
       });
 
   /// Updates the farm details.
-  static Future<void> updateFarm({required String name, required String description,
+  static Future<void> updateFarm({required String farmId, required String name, required String description,
     required double latitude, required double longitude}) => _call('updateFarm', {
       'farmId': farmId,
       'changes': {'farmName': name, 'description': description,
@@ -48,11 +48,11 @@ class RasdManagementService {
     });
 
   /// Deletes the farm.
-  static Future<void> deleteFarm() => _call('deleteFarm', {'farmId': farmId});
+  static Future<void> deleteFarm(String farmId) => _call('deleteFarm', {'farmId': farmId});
 
   /// Watches the palms belonging to the selected farm.
   static Stream<List<PalmData>> watchPalms() =>
-      _db.ref('palms/$farmId').onValue.map((event) {
+      _db.ref('farms/$farmId/palms').onValue.map((event) {
         final value = event.snapshot.value;
         if (value is! Map) return <PalmData>[];
         final result = <PalmData>[];
@@ -245,6 +245,7 @@ class RasdManagementService {
       return <String, String>{
         'farmerId': farmer['farmerId'].toString(),
         'fullName': farmer['fullName'].toString(),
+        'phoneNumber': (farmer['phoneNumber'] as String?)?.trim() ?? '',
       };
     }).toList();
   }
@@ -264,12 +265,29 @@ class RasdManagementService {
 
   /// Watches invitations sent for the selected farm.
   static Stream<List<Map<String, dynamic>>> watchInvitations() =>
-      _db.ref('farmInvitations').orderByChild('farmId').equalTo(farmId).onValue.map((event) {
+      _db.ref('users/${FirebaseAuth.instance.currentUser!.uid}/sentFarmInvitations').onValue.map((event) {
         if (event.snapshot.value is! Map) return <Map<String, dynamic>>[];
-        return (event.snapshot.value as Map).entries.map((entry) {
-          final d = Map<String, dynamic>.from(entry.value as Map);
-          return <String, dynamic>{'id': entry.key.toString(), ...d};
-        }).toList();
+        final selectedFarmId = farmId;
+        final byFarmer = <String, Map<String, dynamic>>{};
+        for (final entry in (event.snapshot.value as Map).entries) {
+          final invitation = Map<String, dynamic>.from(entry.value as Map);
+          if (invitation['farmId'] != selectedFarmId) continue;
+          final invitationId = entry.key.toString();
+          final farmerId = invitation['farmerId']?.toString() ?? invitationId;
+          final previous = byFarmer[farmerId];
+          if (previous != null) {
+            // Older data can still contain duplicate rows until the pair is updated.
+            final rejected = invitation['status'] == 'rejected';
+            final previousRejected = previous['status'] == 'rejected';
+            final createdAt = invitation['createdAt'];
+            final previousCreatedAt = previous['createdAt'];
+            final newer = createdAt is num &&
+                (previousCreatedAt is! num || createdAt > previousCreatedAt);
+            if (rejected == previousRejected ? !newer : rejected) continue;
+          }
+          byFarmer[farmerId] = {...invitation, 'id': invitationId};
+        }
+        return byFarmer.values.toList();
       });
 
   /// Cancels a pending invitation.
@@ -279,7 +297,7 @@ class RasdManagementService {
   /// Watches invitations received by the signed-in farmer.
   static Stream<List<Map<String, dynamic>>> watchMyInvitations() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    return _db.ref('farmInvitations').orderByChild('farmerId').equalTo(uid).onValue.map((event) {
+    return _db.ref('users/$uid/farmInvitations').onValue.map((event) {
       if (event.snapshot.value is! Map) return <Map<String, dynamic>>[];
       return (event.snapshot.value as Map).entries.map((entry) {
         final d = Map<String, dynamic>.from(entry.value as Map);

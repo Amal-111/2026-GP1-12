@@ -16,14 +16,16 @@ class FarmRecord {
   final double latitude;
   final double longitude;
   final int totalPalms;
+  final int registeredPalmCount;
 
   const FarmRecord({required this.id, required this.name, required this.description,
     required this.image, required this.latitude, required this.longitude,
-    required this.totalPalms});
+    required this.totalPalms, required this.registeredPalmCount});
 
   /// Converts one database entry into a farm record.
   factory FarmRecord.fromEntry(String id, Object? value) {
     final d = Map<String, dynamic>.from(value as Map);
+    final palms = d['palms'];
     return FarmRecord(
       id: id,
       name: (d['farmName'] ?? '').toString(),
@@ -32,6 +34,7 @@ class FarmRecord {
       latitude: (d['latitude'] as num).toDouble(),
       longitude: (d['longitude'] as num).toDouble(),
       totalPalms: (d['totalPalms'] as num).toInt(),
+      registeredPalmCount: palms is Map ? palms.length : 0,
     );
   }
 }
@@ -128,58 +131,5 @@ class RasdFarmsService {
   }
 
 
-  /// Deletes a replaced farm photo only when the Storage path is valid.
-  static Future<void> deletePreviousFarmImage({
-    required String farmId,
-    required String previousImageUrl,
-    required String newImageUrl,
-  }) async {
-    if (previousImageUrl.isEmpty) return;
-
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      throw StateError((AuthStore.arabic.value ? 'انتهت جلسة تسجيل الدخول.' : 'Your session has ended.'));
-    }
-
-    // Extract the old file path from its Firebase Storage URL.
-    final uri = Uri.parse(previousImageUrl);
-    final segments = uri.pathSegments;
-    final objectIndex = segments.indexOf('o');
-
-    if (objectIndex == -1 || objectIndex + 1 >= segments.length) {
-      throw StateError((AuthStore.arabic.value ? 'رابط صورة المزرعة السابقة غير صالح.' : 'Invalid previous farm image URL.'));
-    }
-
-    final oldPath = segments[objectIndex + 1];
-    final validPrefix = 'farmImages/$uid/$farmId.';
-
-    // Never delete an unrelated Storage file.
-    if (!oldPath.startsWith(validPrefix) ||
-        !['jpg', 'jpeg', 'png', 'webp']
-            .contains(oldPath.substring(validPrefix.length))) {
-      throw StateError((AuthStore.arabic.value ? 'مسار صورة المزرعة غير متوقع.' : 'Unexpected farm image path.'));
-    }
-
-    final oldReference = FirebaseStorage.instance.ref().child(oldPath);
-
-    // If the new image has the same path, the upload
-    // has already replaced the old file.
-    if (newImageUrl.isNotEmpty) {
-      final newSegments = Uri.parse(newImageUrl).pathSegments;
-      final newIndex = newSegments.indexOf('o');
-
-      if (newIndex == -1 || newIndex + 1 >= newSegments.length) {
-        throw StateError((AuthStore.arabic.value ? 'رابط صورة المزرعة الجديدة غير صالح.' : 'Invalid new farm image URL.'));
-      }
-
-      if (oldPath == newSegments[newIndex + 1]) return;
-    }
-
-    try {
-      await oldReference.delete();
-    } on FirebaseException catch (error) {
-      if (error.code != 'object-not-found') rethrow;
-    }
-  }
 
 }

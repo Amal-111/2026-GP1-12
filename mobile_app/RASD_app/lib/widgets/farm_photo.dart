@@ -54,7 +54,7 @@ class FarmImageView extends StatelessWidget {
             child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         },
-        errorBuilder: (_, __, ___) => _placeholder(),
+        errorBuilder: (_, _, _) => _placeholder(),
       );
     }
 
@@ -65,7 +65,7 @@ class FarmImageView extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _placeholder(),
+        errorBuilder: (_, _, _) => _placeholder(),
       );
     }
 
@@ -75,7 +75,7 @@ class FarmImageView extends StatelessWidget {
       width: width,
       height: height,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _placeholder(),
+      errorBuilder: (_, _, _) => _placeholder(),
     );
   }
 }

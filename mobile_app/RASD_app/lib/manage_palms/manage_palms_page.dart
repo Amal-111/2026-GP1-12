@@ -232,7 +232,7 @@ isArabic ? 'لم يتم العثور على نخيل' : 'No palms found',
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                           itemCount: palms.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) =>
                               _buildPalmCard(palms[index]),

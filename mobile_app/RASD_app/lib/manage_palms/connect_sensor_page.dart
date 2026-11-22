@@ -30,7 +30,6 @@ class ConnectSensorPage extends StatefulWidget {
 }
 
 class _ConnectSensorPageState extends State<ConnectSensorPage> {
-  final PalmStore _store = PalmStore.instance;
   final _formKey = GlobalKey<FormState>();
 
   final _deviceController = TextEditingController();

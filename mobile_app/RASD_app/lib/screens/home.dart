@@ -60,8 +60,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return value.entries.map((entry) {
       final data = _asMap(entry.value);
       return <String, dynamic>{
-        'id': entry.key.toString(),
         ...data,
+        'id': entry.key.toString(),
       };
     }).toList();
   }
@@ -159,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Opens the details of an alert.
   void _openAlertDetails(Map<String, dynamic> alert) {
     final rasdAlert = RasdAlert.fromMap(
-      _text(alert['id']),
+      alert['id'] as String,
       _farmId,
       alert,
     );
@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AlertDetailsScreen(alert: rasdAlert),
+        builder: (context) => AlertDetailsScreen(alert: rasdAlert, farmName: _farmName),
       ),
     );
   }
@@ -301,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return StreamBuilder<DatabaseEvent>(
           key: ValueKey('palms_$farmId'),
-          stream: _db.ref('palms/$farmId').onValue,
+          stream: _db.ref('farms/$farmId/palms').onValue,
           builder: (context, palmsSnapshot) {
             if (palmsSnapshot.hasError) {
               return _errorPage(palmsSnapshot.error);
@@ -313,39 +313,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
             _palms = _asList(palmsSnapshot.data!.snapshot.value);
 
-            return StreamBuilder<DatabaseEvent>(
-              key: ValueKey('alerts_$farmId'),
-              stream: _db.ref('alerts/$farmId').onValue,
-              builder: (context, alertsSnapshot) {
-                if (alertsSnapshot.hasError) {
-                  return _errorPage(alertsSnapshot.error);
+            // Derive alerts and current device status from the palm snapshot.
+            // No farm-wide monitoringDevices or alerts listeners are needed.
+            _alerts = [];
+            _devices = {};
+            for (final palm in _palms) {
+              final palmId = palm['id'] as String;
+              final alertsValue = palm['alerts'];
+              if (alertsValue is Map) {
+                for (final entry in alertsValue.entries) {
+                  if (entry.value is! Map) continue;
+                  _alerts.add(<String, dynamic>{
+                    ..._asMap(entry.value),
+                    'id': entry.key.toString(),
+                    'palmId': palmId,
+                  });
                 }
-
-                if (!alertsSnapshot.hasData) {
-                  return _loadingPage();
-                }
-
-                _alerts = _asList(alertsSnapshot.data!.snapshot.value);
-
-                return StreamBuilder<DatabaseEvent>(
-                  key: ValueKey('devices_$farmId'),
-                  stream: _db.ref('monitoringDevices').onValue,
-                  builder: (context, devicesSnapshot) {
-                    if (devicesSnapshot.hasError) {
-                      // The home can still show farm data even if
-                      // device status is temporarily unavailable.
-                      _devices = {};
-                    } else if (devicesSnapshot.hasData) {
-                      _devices = _asMap(
-                        devicesSnapshot.data!.snapshot.value,
-                      );
-                    }
-
-                    return _buildMainScaffold();
-                  },
-                );
-              },
-            );
+              }
+              final deviceId = _text(palm['deviceId']);
+              final device = _asMap(palm['monitoringDevice']);
+              if (deviceId.isNotEmpty && device.isNotEmpty) {
+                _devices[deviceId] = device;
+              }
+            }
+            return _buildMainScaffold();
           },
         );
       },
@@ -383,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentPage = AlertsScreen(
           key: ValueKey(_farmId),
           farmId: _farmId,
+          farmName: _farmName,
         );
         break;
 
@@ -443,12 +435,12 @@ return Scaffold(
     final recentAlerts = [..._alerts];
 
     recentAlerts.sort((a, b) {
-      final first = _date(a['timestamp']) ??
-          _date(a['createdAt']) ??
+      final first = RasdAlert.parseTimestamp(a['timestamp']) ??
+          RasdAlert.parseTimestamp(a['createdAt']) ??
           DateTime.fromMillisecondsSinceEpoch(0);
 
-      final second = _date(b['timestamp']) ??
-          _date(b['createdAt']) ??
+      final second = RasdAlert.parseTimestamp(b['timestamp']) ??
+          RasdAlert.parseTimestamp(b['createdAt']) ??
           DateTime.fromMillisecondsSinceEpoch(0);
 
       return second.compareTo(first);
@@ -816,13 +808,15 @@ return Scaffold(
         ? (isArabic ? 'الحساس غير متصل' : 'Sensor Offline')
         : alertType == 'PossiblePestDetected'
         ? (isArabic ? 'اشتباه بإصابة' : 'Potential Infestation')
+        : alertType == 'UnderMonitoring'
+        ? (isArabic ? localizedAlertTitle(alertType, '') : 'Palm Under Monitoring')
         : (isArabic ? 'تنبيه المزرعة' : 'Farm Alert');
 
-    final palmId = _text(alert['palmId']);
+    final palmId = alert['palmId'] as String;
 
     final createdAt =
-        _date(alert['timestamp']) ??
-            _date(alert['createdAt']);
+        RasdAlert.parseTimestamp(alert['timestamp']) ??
+            RasdAlert.parseTimestamp(alert['createdAt']);
 
     return GlassBox(
       padding: EdgeInsets.zero,

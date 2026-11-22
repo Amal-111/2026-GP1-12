@@ -125,7 +125,7 @@ export const recordTreatment = onCall(options, async (request) => {
   // Generate record IDs only once.
   
   // Generate one ID for the unified history event.
-  const historyId = db().ref('monitoringHistory').push().key;
+  const historyId = db().ref(`farms/${farmId}/palms/${palmId}/monitoringHistory`).push().key;
 
   if (!historyId) {
     throw new HttpsError(
@@ -140,7 +140,7 @@ export const recordTreatment = onCall(options, async (request) => {
   // authoritative and repeats the checks to prevent time-of-check races.
   const [farmCheck, palmCheck] = await Promise.all([
     db().ref(`farms/${farmId}/deleting`).get(),
-    db().ref(`palms/${farmId}/${palmId}/healthStatus`).get(),
+    db().ref(`farms/${farmId}/palms/${palmId}/healthStatus`).get(),
   ]);
   if (farmCheck.val() === true || palmCheck.val() !== 'Suspected') {
     throw new HttpsError(
@@ -162,9 +162,9 @@ export const recordTreatment = onCall(options, async (request) => {
   ? {Authorization: 'Bearer owner'}
   : {Authorization: `Bearer ${token}`};
 
-  // The current schema stores palm status and history in separate root paths.
-  // A root ETag update keeps both changes atomic; do not replace this with
-  // independent writes. The root-level approach still needs redesign for scale.
+  // Embedded palm status and history now share one palm object.
+  // The prototype still uses the original root ETag approach to recheck
+  // cross-path authorization; scope this operation before production.
   // Retry if another writer changes the database.
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const response = await requestWithTimeout(endpoint, {
@@ -200,7 +200,7 @@ export const recordTreatment = onCall(options, async (request) => {
     }
 
     const farm = root.farms?.[farmId];
-    const palm = root.palms?.[farmId]?.[palmId];
+    const palm = farm.palms?.[palmId];
 
     if (!farm || !palm) {
       throw new HttpsError(
@@ -237,11 +237,8 @@ export const recordTreatment = onCall(options, async (request) => {
     palm.healthStatus = 'UnderMonitoring';
 
     // Save one unified treatment event.
-    root.monitoringHistory ??= {};
-    root.monitoringHistory[farmId] ??= {};
-    root.monitoringHistory[farmId][palmId] ??= {};
-
-    root.monitoringHistory[farmId][palmId][historyId] = {
+    palm.monitoringHistory ??= {};
+    palm.monitoringHistory[historyId] = {
       eventType: 'Treatment',
       healthStatus: 'UnderMonitoring',
       timestamp,

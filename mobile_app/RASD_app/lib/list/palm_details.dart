@@ -67,7 +67,7 @@ class _PalmDetailsPageState extends State<PalmDetailsPage> {
   /// Subscribes to live updates for this palm.
   void _configurePalmStream() {
     _palmRef = FirebaseDatabase.instance.ref(
-      'palms/${widget.farmId}/${widget.palmId}',
+      'farms/${widget.farmId}/palms/${widget.palmId}',
     );
     _palmStream = _palmRef.onValue;
   }
@@ -253,7 +253,7 @@ isArabic ? 'لم يتم العثور على النخلة.' : 'Palm not found.',
         return StreamBuilder<DatabaseEvent>(
           key: ValueKey(deviceId),
           stream: FirebaseDatabase.instance
-              .ref('monitoringDevices/$deviceId')
+              .ref('farms/${widget.farmId}/palms/${widget.palmId}/monitoringDevice')
               .onValue,
           builder: (context, deviceSnapshot) {
             if (deviceSnapshot.hasError) {

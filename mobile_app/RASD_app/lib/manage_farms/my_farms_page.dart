@@ -113,11 +113,11 @@ isArabic ? 'لم يتم العثور على مزارع' : 'No farms found',
                       : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     itemCount: farms.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                     const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final farm = farms[index];
-                      final palmCount = farm.totalPalms;
+                      final palmCount = farm.registeredPalmCount;
 
 return _FarmCard(
 farm: farm,
