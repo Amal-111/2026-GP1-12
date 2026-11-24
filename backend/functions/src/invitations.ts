@@ -26,8 +26,17 @@ function isAssigned(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function asciiDigits(value: string): string {
+  return value.replace(/[٠-٩۰-۹]/g, digit => String(digit.charCodeAt(0) & 0xf));
+}
+
+function normalizePhone(value: string): string {
+  return asciiDigits(value).replace(/[^0-9]/g, '')
+    .replace(/^(?:(?:00966|966)0?|0)(?=5)/, '');
+}
+
 // =====================================================
-// 1. SEARCH FARMERS BY NAME
+// 1. SEARCH FARMERS BY NAME OR PHONE
 // =====================================================
 
 export const searchFarmers = onCall(options, async request => {
@@ -69,15 +78,12 @@ export const searchFarmers = onCall(options, async request => {
     );
   }
 
-  // Search using the beginning of fullName.
-  // Results are deliberately limited.
-  const snapshot = await db()
-    .ref('users')
-    .orderByChild('fullName')
-    .startAt(query)
-    .endAt(query + '\uf8ff')
-    .limitToFirst(50)
-    .get();
+  const digitsQuery = asciiDigits(query);
+  const isPhone = /^[0-9+\s().-]+$/.test(digitsQuery) && /[0-9]/.test(digitsQuery);
+  const phonePrefix = isPhone ? normalizePhone(digitsQuery) : undefined;
+  if (phonePrefix !== undefined && (phonePrefix.length < 7 || phonePrefix.length > 15)) {
+    throw new HttpsError('invalid-argument', 'Enter at least seven phone digits, excluding the Saudi prefix.');
+  }
 
   const farmers: Array<{
     farmerId: string;
@@ -85,26 +91,43 @@ export const searchFarmers = onCall(options, async request => {
     phoneNumber: string;
   }> = [];
 
-  snapshot.forEach(child => {
-    const farmer = asMap(child.val());
+  function collect(farmerId: string | null, farmer: DataMap | null): boolean {
+    if (farmerId && farmer?.role === 'Farmer' && !isAssigned(farmer.farmId)) {
+      const phoneNumber = typeof farmer.phoneNumber === 'string' ? farmer.phoneNumber.trim() : '';
+      if (phonePrefix !== undefined && !normalizePhone(phoneNumber).startsWith(phonePrefix)) {
+        return false;
+      }
 
-    if (
-      child.key &&
-      farmer?.role === 'Farmer' &&
-      !isAssigned(farmer.farmId)
-    ) {
       farmers.push({
-        farmerId: child.key,
+        farmerId,
         fullName: String(farmer.fullName ?? ''),
-        phoneNumber: typeof farmer.phoneNumber === 'string'
-          ? farmer.phoneNumber.trim()
-          : '',
+        phoneNumber,
       });
     }
-
-    // Stop after finding ten available farmers.
     return farmers.length >= 10;
-  });
+  }
+
+  const users = db().ref('users');
+  if (phonePrefix === undefined) {
+    const snapshot = await users.orderByChild('fullName')
+      .startAt(query).endAt(query + '\uf8ff').limitToFirst(50).get();
+    snapshot.forEach(child => collect(child.key, asMap(child.val())));
+  } else {
+    // Phone formatting varies in storage. Page through the indexed farmer role
+    // and normalize only in the callable so raw profiles stay server-side.
+    const byRole = users.orderByChild('role');
+    const pageSize = 50;
+    let cursor: string | undefined;
+    while (farmers.length < 10) {
+      const page = await (cursor === undefined ? byRole.equalTo('Farmer') :
+        byRole.startAfter('Farmer', cursor).endAt('Farmer')).limitToFirst(pageSize).get();
+      page.forEach(child => {
+        cursor = child.key ?? undefined;
+        return collect(child.key, asMap(child.val()));
+      });
+      if (page.numChildren() < pageSize) break;
+    }
+  }
 
   return {
     farmers,

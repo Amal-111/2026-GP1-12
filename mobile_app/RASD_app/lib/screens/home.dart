@@ -554,7 +554,7 @@ return Scaffold(
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      isArabic ? 'إجمالي النخيل' : 'Total Palms',
+                      isArabic ? ' إجمالي عدد الخيل المراقب' : 'Total Number of Palms Monitored',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,

@@ -217,13 +217,13 @@ required this.onManage,
                 ),
 
                 const SizedBox(height: 4),
-
+/*
 Text(
 isArabic ? 'عدد النخيل: $palmCount' : '$palmCount Total Palms',
 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
 color: AppColors.textSecondary,
 ),
-),
+), */
 
                 const SizedBox(height: 10),
 

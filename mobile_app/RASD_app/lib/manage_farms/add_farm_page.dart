@@ -238,10 +238,10 @@ return PalmScaffold(
                                   : 'Enter the number of palms as a whole number.';
                             }
 
-                            if (count < 0) {
+                            if (count < 1) {
                               return AuthStore.arabic.value
-                                  ? 'أدخل عددًا يساوي صفرًا أو أكثر.'
-                                  : 'Enter a number of palms that is 0 or more.';
+                                  ? 'أدخل عددًا يساوي واحد أو أكثر.'
+                                  : 'Enter a number of palms that is 1 or more.';
                             }
 
                             return null;

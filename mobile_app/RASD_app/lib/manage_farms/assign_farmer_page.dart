@@ -35,7 +35,7 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
     super.dispose();
   }
 
-  /// Searches for available farmers by name.
+  /// Searches for available farmers by name or phone number.
   Future<void> _searchFarmers() async {
     if (_searching || _saving) return;
 
@@ -62,7 +62,6 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
 
     try {
       debugPrint('SEARCH FARMERS: Starting search');
-      debugPrint('SEARCH FARMERS NAME: $name');
 
       final results =
       await RasdManagementService.searchFarmers(name);
@@ -206,8 +205,8 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
                         children: [
                           Text(
                             isArabic
-                                ? 'اسم المزارع'
-                                : 'Farmer Name',
+                                ? 'الاسم أو رقم الهاتف'
+                                : 'Name or Phone Number',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleSmall,
@@ -220,8 +219,8 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
                             textInputAction: TextInputAction.search,
                             decoration: InputDecoration(
                               hintText: isArabic
-                                  ? 'أدخل اسم المزارع للبحث'
-                                  : 'Enter farmer name to search',
+                                  ? 'أدخل الاسم أو رقم الهاتف للبحث'
+                                  : 'Enter name or phone number',
                               prefixIcon: const Icon(
                                 Icons.search,
                               ),

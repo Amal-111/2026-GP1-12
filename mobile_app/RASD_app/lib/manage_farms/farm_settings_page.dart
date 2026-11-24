@@ -22,6 +22,8 @@ class FarmSettingsPage extends StatefulWidget {
 
 class _FarmSettingsPageState extends State<FarmSettingsPage> {
   late final TextEditingController _nameController;
+  late final TextEditingController _capacityController;
+  late int _savedCapacity;
   late final TextEditingController _descriptionController;
 
   /// Photo shown on screen: a saved web address or a file just picked.
@@ -44,6 +46,8 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
     final farm = widget.farm;
 
+    _savedCapacity = farm.palmCount;
+    _capacityController = TextEditingController(text: _savedCapacity.toString());
     _nameController = TextEditingController(
       text: farm.name,
     );
@@ -63,6 +67,7 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _capacityController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -115,6 +120,21 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
       );
       return;
     }
+    final capacityText = _capacityController.text.trim();
+    final capacity = int.tryParse(capacityText);
+    if (!RegExp(r'^[0-9]+$').hasMatch(capacityText) ||
+        capacity == null ||
+        capacity < 1 ||
+        capacity > 1000000) {
+      showCenterMessage(
+        context,
+        AuthStore.arabic.value
+            ? 'أدخل عددًا صحيحًا من 1 إلى 1000000.'
+            : 'Enter a whole number from 1 to 1,000,000.',
+        success: false,
+      );
+      return;
+    }
     if (_latitude == null || _longitude == null) {
       showCenterMessage(
         context,
@@ -131,14 +151,16 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
 
     setState(() => _saving = true);
     try {
-      // 1. Save name, description and location.
+      // 1. Save farm details.
       await RasdManagementService.updateFarm(
         farmId: widget.farm.id,
         name: name,
         description: _descriptionController.text.trim(),
         latitude: _latitude!,
         longitude: _longitude!,
+        totalPalms: capacity == _savedCapacity ? null : capacity,
       );
+      _savedCapacity = capacity;
 
       // 2. Photo: upload a new one, or clear it when it was removed.
       final photoChanged = _imagePath != _savedImagePath;
@@ -305,6 +327,18 @@ class _FarmSettingsPageState extends State<FarmSettingsPage> {
                               hintText: isArabic
                                   ? 'أدخل اسم المزرعة'
                                   : 'Enter farm name',
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          _FieldLabel(isArabic ? 'إجمالي النخيل' : 'Total Palms'),
+
+                          TextField(
+                            controller: _capacityController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: isArabic ? 'مثال: 120' : 'e.g. 120',
                             ),
                           ),
 

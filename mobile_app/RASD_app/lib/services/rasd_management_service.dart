@@ -40,12 +40,23 @@ class RasdManagementService {
       });
 
   /// Updates the farm details.
-  static Future<void> updateFarm({required String farmId, required String name, required String description,
-    required double latitude, required double longitude}) => _call('updateFarm', {
-      'farmId': farmId,
-      'changes': {'farmName': name, 'description': description,
-        'latitude': latitude, 'longitude': longitude},
-    });
+  static Future<void> updateFarm({
+    required String farmId,
+    required String name,
+    required String description,
+    required double latitude,
+    required double longitude,
+    int? totalPalms,
+  }) => _call('updateFarm', {
+    'farmId': farmId,
+    'changes': {
+      'farmName': name,
+      'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
+      'totalPalms': ?totalPalms,
+    },
+  });
 
   /// Deletes the farm.
   static Future<void> deleteFarm(String farmId) => _call('deleteFarm', {'farmId': farmId});
@@ -225,15 +236,15 @@ class RasdManagementService {
     'farmId': farmId, 'email': email.trim(),
   });
 
-  /// Searches for available farmers by name.
+  /// Searches for available farmers by name or phone number.
   static Future<List<Map<String, String>>> searchFarmers(
-      String name,
+      String query,
       ) async {
     final result = await _functions
         .httpsCallable('searchFarmers')
         .call({
       'farmId': farmId,
-      'name': name.trim(),
+      'name': query.trim(),
     });
 
     final data = Map<String, dynamic>.from(result.data as Map);

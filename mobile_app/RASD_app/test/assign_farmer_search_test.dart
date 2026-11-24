@@ -41,6 +41,17 @@ class _Callable extends HttpsCallablePlatform {
   @override
   Future<Object?> call([dynamic parameters]) async {
     fake.calls.add((name!, parameters));
+    if (name == 'searchFarmers' && parameters['name'] == '+966 500 222 222') {
+      return {
+        'farmers': [
+          {
+            'farmerId': 'original-uid-second',
+            'fullName': 'Same Name',
+            'phoneNumber': '+966 500 222 222',
+          },
+        ],
+      };
+    }
     return switch (name) {
       'searchFarmers' => {
         'farmers': [
@@ -105,7 +116,16 @@ void main() {
       expect(find.text('+966 500 222 222'), findsOneWidget);
       expect(find.textContaining('Account ID'), findsOneWidget);
 
-      final second = find.text('+966 500 222 222');
+      expect(find.text('Name or Phone Number'), findsOneWidget);
+      await tester.enterText(input, '+966 500 222 222');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text('Same Name'), findsOneWidget);
+      expect(find.text('+966 500 111 111'), findsNothing);
+
+      final second = find.byWidgetPredicate(
+        (widget) => widget is Text && widget.data == '+966 500 222 222',
+      );
       await tester.ensureVisible(second);
       await tester.tap(second);
       await tester.pumpAndSettle();
@@ -116,10 +136,15 @@ void main() {
 
       expect(functions.calls.map((call) => call.$1), [
         'searchFarmers',
+        'searchFarmers',
         'sendInvitation',
       ]);
       expect(functions.calls[0].$2, {'farmId': 'qa-farm', 'name': 'Same'});
       expect(functions.calls[1].$2, {
+        'farmId': 'qa-farm',
+        'name': '+966 500 222 222',
+      });
+      expect(functions.calls[2].$2, {
         'farmId': 'qa-farm',
         'farmerId': 'original-uid-second',
       });

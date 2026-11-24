@@ -182,7 +182,7 @@ export const updateFarm = onCall(options, async request => {
     changes.totalPalms = integer(
       patch.totalPalms,
       'totalPalms',
-      0
+      1
     );
   }
 
@@ -211,7 +211,8 @@ export const updateFarm = onCall(options, async request => {
     const registeredPalms = Object.keys(asMap(farm.palms) ?? {}).length;
     if ('totalPalms' in changes && changes.totalPalms < registeredPalms) {
       reason = 'capacity';
-      return;
+      // Let the server verify this snapshot and retry if the palm count changed.
+      return farm;
     }
     if (changesPhoto && (farm.farmImage ?? null) !== previousPhoto) {
       reason = 'photo-changed';
