@@ -12,9 +12,13 @@ export const connectDevice = onCall(options, async (request) => {
   const palmId = id(d.palmId, 'palmId');
   const deviceId = id(d.deviceId, 'deviceId');
   await farmAccess(user.uid, user.role, farmId, user.farmId);
+  let paired = false;
   const tx = await db().ref().transaction(root => {
-    const farm = root?.farms?.[farmId];
-    const palm = root?.palms?.[farmId]?.[palmId];
+    paired = false;
+    // Let the server compare the initially empty local cache using its current state.
+    if (root === null) return null;
+    const farm = root.farms?.[farmId];
+    const palm = farm?.palms?.[palmId];
     if (!farm || farm.deleting || !palm || palm.deviceId) return;
     // Recheck current membership inside the transaction. The farmer may have
     // been removed after the initial farmAccess() lookup.
@@ -24,16 +28,16 @@ export const connectDevice = onCall(options, async (request) => {
          root.users?.[user.uid]?.role === 'Farmer' &&
          root.users[user.uid].farmId === farmId);
     if (!allowed) return;
-    root.monitoringDevices ??= {};
-    const existing = root.monitoringDevices[deviceId];
-    if (existing && (existing.farmId || existing.palmId)) return;
-    // Paired device starts Offline until its first authenticated reading.
-    root.monitoringDevices[deviceId] = {connectionStatus: 'Offline', farmId, palmId};
+    root.monitoringState ??= {};
+    const existing = root.monitoringState[deviceId];
+    if (existing?.farmId || existing?.palmId) return;
+    palm.monitoringDevice = {deviceId, connectionStatus: 'Offline', farmId, palmId};
     palm.deviceId = deviceId;
-    if (root.monitoringState) delete root.monitoringState[deviceId];
+    root.monitoringState[deviceId] = {farmId, palmId};
+    paired = true;
     return root;
   }, undefined, false);
-  if (!tx.committed) throw new HttpsError('failed-precondition', 'Palm/device unavailable or already paired.');
+  if (!tx.committed || !paired) throw new HttpsError('failed-precondition', 'Palm/device unavailable or already paired.');
   return {success: true};
 });
 

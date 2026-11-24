@@ -183,7 +183,7 @@ isArabic ? 'لم يتم العثور على مزارعين' : 'No farmers found'
                       : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     itemCount: farmers.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                     const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       return _buildFarmerCard(farmers[index]);

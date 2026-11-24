@@ -1,7 +1,55 @@
 import {getDatabase} from 'firebase-admin/database';
+import {getStorage} from 'firebase-admin/storage';
 import {HttpsError, CallableRequest} from 'firebase-functions/v2/https';
 
 export const db = () => getDatabase();
+const farmPhotoBucket = 'rasd-6a036.firebasestorage.app';
+const farmPhotoExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+export async function deleteFarmImages(ownerId: string, farmId: string): Promise<void> {
+  const bucket = getStorage().bucket(farmPhotoBucket);
+  for (const extension of farmPhotoExtensions) {
+    await bucket.file(`farmImages/${ownerId}/${farmId}.${extension}`)
+      .delete({ignoreNotFound: true});
+  }
+}
+
+function farmPhotoPath(value: unknown, ownerId: string, farmId: string): string | undefined {
+  if (typeof value !== 'string' || !value) return;
+  try {
+    const parts = new URL(value).pathname.split('/');
+    if (parts.length !== 6 || parts.slice(1, 5).join('/') !==
+      `v0/b/${farmPhotoBucket}/o`) return;
+    const path = decodeURIComponent(parts[5]);
+    const prefix = `farmImages/${ownerId}/${farmId}.`;
+    if (path.startsWith(prefix) &&
+      farmPhotoExtensions.includes(path.slice(prefix.length))) return path;
+  } catch {
+    // External or malformed legacy references have no managed object to delete.
+  }
+  return undefined;
+}
+
+export async function prepareFarmPhotoCleanup(
+  ownerId: string, farmId: string, previous: unknown, next: unknown
+): Promise<(() => Promise<void>) | undefined> {
+  const path = farmPhotoPath(previous, ownerId, farmId);
+  if (!path || path === farmPhotoPath(next, ownerId, farmId)) return;
+  const bucket = getStorage().bucket(farmPhotoBucket);
+  const [metadata] = await bucket.file(path).getMetadata().catch(error => {
+    if (Number(error.code) === 404) return [undefined];
+    throw error;
+  });
+  if (metadata?.generation === undefined) return;
+  return async () => {
+    await bucket.file(path, {
+      preconditionOpts: {ifGenerationMatch: metadata.generation},
+    }).delete({ignoreNotFound: true}).catch(error => {
+      if (Number(error.code) !== 412) throw error;
+      // A new upload replaced the previous generation.
+    });
+  };
+}
 export type Data = Record<string, unknown>;
 export function object(value: unknown): Data {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HttpsError('invalid-argument', 'Expected an object.');
@@ -26,7 +74,9 @@ export function integer(v: unknown, field: string, min: number, max = 1000000): 
 }
 export function id(v: unknown, field: string): string {
   const s = stringField(v, field, 128);
-  if (/[.#$\[\]/\u0000-\u001f\u007f]/.test(s)) throw new HttpsError('invalid-argument', `Invalid ${field}.`);
+  // RTDB keys cannot contain ASCII control characters.
+  // eslint-disable-next-line no-control-regex
+  if (/[.#$[\]/\u0000-\u001f\u007f]/.test(s)) throw new HttpsError('invalid-argument', `Invalid ${field}.`);
   return s;
 }
 export async function actor(request: CallableRequest<unknown>): Promise<{uid: string; role: string; farmId?: string}> {
@@ -66,11 +116,13 @@ export function optionalFarmImage(v: unknown): string | undefined {
 
   const isHttps = url.protocol === 'https:';
 
+  const emulatorPort = process.env.FIREBASE_STORAGE_EMULATOR_HOST
+    ?.match(/:(\d+)\/?$/)?.[1];
   const isLocalEmulator =
-    !!process.env.FIREBASE_STORAGE_EMULATOR_HOST &&
+    emulatorPort !== undefined &&
     url.protocol === 'http:' &&
     ['10.0.2.2', '127.0.0.1', 'localhost'].includes(url.hostname) &&
-    url.port === '9199' &&
+    url.port === emulatorPort &&
     url.pathname.startsWith('/v0/b/');
 
   if (!isHttps && !isLocalEmulator) {

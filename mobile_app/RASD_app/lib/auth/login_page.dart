@@ -113,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                                 width: 72,
                                 height: 72,
                                 fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) =>
+                                errorBuilder: (_, _, _) =>
                                 const SizedBox(
                                   width: 72,
                                   height: 72,

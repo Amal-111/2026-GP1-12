@@ -3,7 +3,7 @@ import {initializeApp} from 'firebase-admin/app';
 import {setGlobalOptions} from 'firebase-functions/v2';
 
 initializeApp({
-  databaseURL: 'https://rasd-6a036-default-rtdb.firebaseio.com',
+  databaseURL: 'https://rasd-6a036-default-rtdb.europe-west1.firebasedatabase.app',
 });
 
 setGlobalOptions({maxInstances: 10});
@@ -21,7 +21,8 @@ export {
   rejectInvitation,
   cancelInvitation,
   removeFarmer,
-  getInvitationDetails
+  getInvitationDetails,
+  listFarmInvitations
 } from './invitations';
 export {
   deleteAccount,

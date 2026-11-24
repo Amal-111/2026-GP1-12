@@ -1,7 +1,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter/foundation.dart';
 
 import '../services/rasd_management_service.dart';
 import '../theme/glass_widgets.dart';
@@ -147,8 +146,23 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
       if (!mounted) return;
 
       Navigator.pop(context, true);
-    } catch (error) {
+
+    } catch (error, stackTrace) {
+      debugPrint('=================================');
+      debugPrint('SEND INVITATION FAILED');
+      debugPrint('ERROR: $error');
+      debugPrint('STACK TRACE: $stackTrace');
+
+      if (error is FirebaseFunctionsException) {
+        debugPrint('FUNCTION CODE: ${error.code}');
+        debugPrint('FUNCTION MESSAGE: ${error.message}');
+        debugPrint('FUNCTION DETAILS: ${error.details}');
+      }
+
+      debugPrint('=================================');
+
       if (mounted) {
+
         showRasdError(
           context,
           error,
@@ -319,8 +333,14 @@ class _AssignFarmerPageState extends State<AssignFarmerPage> {
                                             ),
 
                                             Text(
-                                              '${isArabic ? "معرّف الحساب" : "Account ID"}: '
-                                                  '••••${_idSuffix(farmer['farmerId'] ?? '')}',
+                                              farmer['phoneNumber']?.isNotEmpty == true
+                                                  ? farmer['phoneNumber']!
+                                                  : '${isArabic ? "معرّف الحساب" : "Account ID"}: '
+                                                      '••••${_idSuffix(farmer['farmerId'] ?? '')}',
+                                              textDirection:
+                                                  farmer['phoneNumber']?.isNotEmpty == true
+                                                      ? TextDirection.ltr
+                                                      : null,
                                               style: Theme.of(
                                                 context,
                                               ).textTheme.bodySmall,

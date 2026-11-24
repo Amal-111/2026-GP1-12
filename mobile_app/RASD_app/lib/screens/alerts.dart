@@ -8,9 +8,10 @@ import 'alert_details.dart';
 import '../data/auth_store.dart';
 /// Alerts page.
 class AlertsScreen extends StatefulWidget {
-  const AlertsScreen({super.key, required this.farmId});
+  const AlertsScreen({super.key, required this.farmId, required this.farmName});
 
   final String farmId;
+  final String farmName;
 
   @override
   State<AlertsScreen> createState() => _AlertsScreenState();
@@ -159,7 +160,7 @@ _timeAgo(alert.createdAt, isArabic),
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  AlertDetailsScreen(alert: alert),
+                                  AlertDetailsScreen(alert: alert, farmName: widget.farmName),
                             ),
                           );
 

@@ -159,7 +159,7 @@ isArabic
             Expanded(
               child: StreamBuilder<DatabaseEvent>(
                 stream: FirebaseDatabase.instance
-                    .ref('monitoringHistory/$farmId/$palmId')
+                    .ref('farms/$farmId/palms/$palmId/monitoringHistory')
                     .onValue,
                 builder: (context, snapshot) {
 if (snapshot.hasError) {
@@ -196,7 +196,7 @@ return records.isEmpty
     24,
   ),
   itemCount: records.length,
-  separatorBuilder: (_, __) => const SizedBox(height: 10),
+  separatorBuilder: (_, _) => const SizedBox(height: 10),
   itemBuilder: (context, index) {
     final record = records[index];
     final result = record['result']!;

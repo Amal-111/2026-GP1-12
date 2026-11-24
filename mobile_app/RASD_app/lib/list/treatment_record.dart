@@ -46,32 +46,8 @@ class _TreatmentRecordPageState
   bool _isSaving = false;
 
   Stream<DatabaseEvent> get _palmStream => FirebaseDatabase.instance
-      .ref('palms/${widget.farmId}/${widget.palmId}')
+      .ref('farms/${widget.farmId}/palms/${widget.palmId}')
       .onValue;
-
-  Stream<DatabaseEvent> get _treatmentsStream => FirebaseDatabase.instance
-      .ref('treatmentRecords/${widget.farmId}/${widget.palmId}')
-      .onValue;
-
-  List<Map<String, dynamic>> _readRecords(Object? value) {
-    if (value is! Map) return [];
-    final records = <Map<String, dynamic>>[];
-    value.forEach((key, raw) {
-      if (raw is! Map) return;
-      final data = Map<String, dynamic>.from(raw);
-      final date = DateTime.tryParse(data['treatmentDate']?.toString() ?? '');
-      if (date == null) return;
-      records.add({
-        'id': key.toString(),
-        'method': data['treatmentMethod']?.toString() ?? '',
-        'date': date,
-        'notes': data['notes']?.toString() ?? '',
-      });
-    });
-    records.sort((a, b) =>
-        (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-    return records;
-  }
 
   /// Initializes screen state.
   @override
@@ -325,7 +301,7 @@ isArabic ? 'طريقة العلاج' : 'Treatment Method',
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: _selectedMethod,
+                        initialValue: _selectedMethod,
                         isExpanded: true,
                         decoration: InputDecoration(
 hintText: isArabic ? 'اختر طريقة العلاج' : 'Select method',

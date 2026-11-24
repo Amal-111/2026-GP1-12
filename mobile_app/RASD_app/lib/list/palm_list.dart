@@ -7,7 +7,6 @@ import '../theme/app_colors.dart';
 import '../manage_palms/add_palm_page.dart';
 import 'palm_details.dart';
 import '../services/rasd_errors.dart';
-import '../theme/glass_widgets.dart';
 import '../data/auth_store.dart';
 /// Palm list page.
 class PalmListPage extends StatefulWidget {
@@ -237,7 +236,7 @@ label: Text(isArabic ? 'إضافة نخلة' : 'Add Palm'),
         child: StreamBuilder<DatabaseEvent>(
           key: ValueKey(widget.farmId),
           stream: FirebaseDatabase.instance
-              .ref('palms/${widget.farmId}')
+              .ref('farms/${widget.farmId}/palms')
               .onValue,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -416,7 +415,7 @@ allPalms.isEmpty
                       20, 0, 20, 90,
                     ),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                     const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final palm = filtered[index];

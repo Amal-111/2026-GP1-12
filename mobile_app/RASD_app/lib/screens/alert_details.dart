@@ -12,21 +12,43 @@ import '../data/auth_store.dart';
 /// Alert details page.
 class AlertDetailsScreen extends StatefulWidget {
   final RasdAlert alert;
+  final String farmName;
 
-  const AlertDetailsScreen({super.key, required this.alert});
+  const AlertDetailsScreen({super.key, required this.alert, required this.farmName});
 
   @override
   State<AlertDetailsScreen> createState() => _AlertDetailsScreenState();
 }
 
 class _AlertDetailsScreenState extends State<AlertDetailsScreen> {
+  late final _alertStream = RasdAlertService.watchAlert(widget.alert);
+
 /// Builds the page with localized labels.
 @override
 Widget build(BuildContext context) {
 return ValueListenableBuilder<bool>(
 valueListenable: AuthStore.arabic,
 builder: (context, isArabic, child) {
-final alert = widget.alert;
+return StreamBuilder<DatabaseEvent>(
+  stream: _alertStream,
+  builder: (context, snapshot) {
+    final path = widget.alert;
+    final raw = snapshot.data?.snapshot.value;
+    if (snapshot.hasError || raw is! Map) {
+      final loading = _alertStream != null && !snapshot.hasError && !snapshot.hasData;
+      return Scaffold(
+        appBar: AppBar(title: Text(isArabic ? '?????? ???????' : 'Alert Details')),
+        body: Center(
+          child: loading
+              ? const CircularProgressIndicator()
+              : Text(isArabic ? '??? ??????? ??? ????.' : 'This alert is unavailable.'),
+        ),
+      );
+    }
+    final alert = RasdAlert.fromMap(path.id, path.farmId, {
+      ...raw,
+      'palmId': path.palmId,
+    });
     final color = alertTypeColor(alert.type);
 
 String recommendation = isArabic
@@ -47,11 +69,7 @@ recommendation = isArabic
 appBar: AppBar(
 title: Text(isArabic ? 'تفاصيل التنبيه' : 'Alert Details'),
 ),
-      body: StreamBuilder<DatabaseEvent>(
-        stream: FirebaseDatabase.instance.ref('palms/${alert.farmId}/${alert.palmId}').onValue,
-        builder: (context, snapshot) {
-          final hasPalmReference = alert.farmId.isNotEmpty && alert.palmId.isNotEmpty;
-          return SingleChildScrollView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,6 +88,7 @@ title: Text(isArabic ? 'تفاصيل التنبيه' : 'Alert Details'),
                           isArabic ? localizedAlertTitle(alert.type, alert.title) : alert.title,
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
                         ),
+                        Text(widget.farmName),
                         Text(alert.palmId),
                         Text(
                           alert.createdAt == null
@@ -126,7 +145,7 @@ isArabic
                           TextButton.icon(
                             icon: const Icon(Icons.map_outlined),
 label: Text(isArabic ? 'عرض على الخريطة' : 'View on Map'),
-                            onPressed: !hasPalmReference ? null : () {
+                            onPressed: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -141,9 +160,7 @@ label: Text(isArabic ? 'عرض على الخريطة' : 'View on Map'),
                           TextButton.icon(
                             icon: const PalmIcon(),
 label: Text(isArabic ? 'تفاصيل النخلة' : 'Palm Details'),
-                            onPressed: !hasPalmReference
-                                ? null
-                                : () {
+                            onPressed: () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(builder: (context) => PalmDetailsPage(farmId: alert.farmId, palmId: alert.palmId)),
@@ -202,10 +219,10 @@ fontSize: 17,
             ),
           ],
         ),
-      );
-        },
       ),
     );
+  },
+);
 },
 );
 }

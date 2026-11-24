@@ -1,30 +1,49 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+// FlutterFire platform interfaces provide the signed-out test doubles.
+// ignore_for_file: depend_on_referenced_packages
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:rasd_app/auth/login_page.dart';
+import 'package:rasd_app/auth/welcome_page.dart';
+import 'package:rasd_app/data/auth_store.dart';
 import 'package:rasd_app/main.dart';
 
+class _SignedOutAuth extends FirebaseAuthPlatform {
+  @override
+  FirebaseAuthPlatform delegateFor({required FirebaseApp app}) => this;
+
+  @override
+  FirebaseAuthPlatform setInitialValues({
+    InternalUserDetails? currentUser,
+    String? languageCode,
+  }) => this;
+
+  @override
+  UserPlatform? get currentUser => null;
+}
+
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    setupFirebaseCoreMocks();
+    await Firebase.initializeApp();
+    FirebaseAuthPlatform.instance = _SignedOutAuth();
+    AuthStore.arabic.value = false;
+  });
+
+  testWidgets('Signed-out launch shows Welcome and opens Login', (
+    tester,
+  ) async {
     await tester.pumpWidget(const RasdApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.byType(WelcomePage), findsOneWidget);
+    expect(find.text('Sign Up'), findsOneWidget);
+    await tester.tap(find.text('Log In'));
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.byType(LoginPage), findsOneWidget);
   });
 }

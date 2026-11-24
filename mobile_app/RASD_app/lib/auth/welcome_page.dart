@@ -68,7 +68,7 @@ final height = MediaQuery.of(context).size.height;
                       width: 84,
                       height: 84,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox(
+                      errorBuilder: (_, _, _) => const SizedBox(
                         width: 84,
                         height: 84,
                         child: Center(

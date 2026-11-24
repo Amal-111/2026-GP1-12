@@ -381,6 +381,7 @@ title: isArabic ? 'موقع المزرعة' : 'Farm Location',
             children: [
               Expanded(
                 child: FarmLocationPicker(
+                  showCurrentLocation: true,
                   latitude: _latitude,
                   longitude: _longitude,
                   pinIcon: Icons.agriculture_rounded,

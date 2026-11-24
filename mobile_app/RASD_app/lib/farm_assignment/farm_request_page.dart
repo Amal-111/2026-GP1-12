@@ -93,7 +93,7 @@ class _FarmRequestPageState extends State<FarmRequestPage> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                   itemCount: invitations.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                   const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final invitation = invitations[index];

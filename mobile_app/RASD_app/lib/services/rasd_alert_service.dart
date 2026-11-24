@@ -61,28 +61,29 @@ class RasdAlert {
         : 'A new alert has been recorded.';
   }
 
+  static DateTime? parseTimestamp(Object? value) {
+    if (value is String) return DateTime.tryParse(value);
+    if (value is! num || !value.isFinite) return null;
+    final milliseconds = value >= 0 && value < 100000000000
+        ? value * 1000
+        : value;
+    if (milliseconds.abs() > 8640000000000000) return null;
+    return DateTime.fromMillisecondsSinceEpoch(milliseconds.toInt());
+  }
+
   /// Creates an alert using its original Firebase fields and identifiers.
   factory RasdAlert.fromMap(
       String id,
       String farmId,
       Map<dynamic, dynamic> data,
       ) {
-    final rawTimestamp = data['timestamp'];
-
-    DateTime? createdAt;
-
-    if (rawTimestamp is num) {
-      createdAt = DateTime.fromMillisecondsSinceEpoch(
-        rawTimestamp.toInt(),
-      );
-    }
-
     return RasdAlert(
       id: id,
       farmId: farmId,
       palmId: (data['palmId'] ?? '').toString(),
       type: (data['alertType'] ?? '').toString(),
-      createdAt: createdAt,
+      createdAt: parseTimestamp(data['timestamp']) ??
+          parseTimestamp(data['createdAt']),
       isRead: data['isRead'] == true,
     );
   }
@@ -90,6 +91,16 @@ class RasdAlert {
 
 /// Reads alerts.
 class RasdAlertService {
+  static final _invalidKey = RegExp(r'[.#$\[\]/\x00-\x1f\x7f]');
+
+  static Stream<DatabaseEvent>? watchAlert(RasdAlert alert) {
+    final keys = [alert.farmId, alert.palmId, alert.id];
+    if (keys.any((key) => key.trim().isEmpty || _invalidKey.hasMatch(key))) {
+      return null;
+    }
+    return _db.ref('farms/${alert.farmId}/palms/${alert.palmId}/alerts/${alert.id}').onValue;
+  }
+
   static final FirebaseDatabase _db =
       FirebaseDatabase.instance;
 
@@ -97,36 +108,29 @@ class RasdAlertService {
   static Stream<List<RasdAlert>> watchAlerts(
       String farmId,
       ) {
-    return _db.ref('alerts/$farmId').onValue.map((event) {
-      final value = event.snapshot.value;
-
-      if (value is! Map) {
-        return <RasdAlert>[];
-      }
-
+    // Alerts are embedded in each palm; there is no global alerts node.
+    return _db.ref('farms/$farmId/palms').onValue.map((event) {
+      final palms = event.snapshot.value;
+      if (palms is! Map) return <RasdAlert>[];
       final alerts = <RasdAlert>[];
-
-      for (final entry in value.entries) {
-        if (entry.value is! Map) continue;
-
-        alerts.add(
-          RasdAlert.fromMap(
-            entry.key.toString(),
-            farmId,
-            entry.value as Map,
-          ),
-        );
+      for (final palmEntry in palms.entries) {
+        if (palmEntry.value is! Map) continue;
+        final palmId = palmEntry.key.toString();
+        final palm = palmEntry.value as Map;
+        final palmAlerts = palm['alerts'];
+        if (palmAlerts is! Map) continue;
+        for (final alertEntry in palmAlerts.entries) {
+          if (alertEntry.value is! Map) continue;
+          final alert = Map<dynamic, dynamic>.from(alertEntry.value as Map);
+          // Preserve the original alert ID and the parent palm ID.
+          alert['palmId'] = palmId;
+          alerts.add(RasdAlert.fromMap(
+              alertEntry.key.toString(), farmId, alert));
+        }
       }
-
-      alerts.sort((a, b) {
-        final aTime =
-            a.createdAt?.millisecondsSinceEpoch ?? 0;
-        final bTime =
-            b.createdAt?.millisecondsSinceEpoch ?? 0;
-
-        return bTime.compareTo(aTime);
-      });
-
+      alerts.sort((a, b) =>
+          (b.createdAt?.millisecondsSinceEpoch ?? 0)
+              .compareTo(a.createdAt?.millisecondsSinceEpoch ?? 0));
       return alerts;
     });
   }

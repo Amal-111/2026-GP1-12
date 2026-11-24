@@ -237,7 +237,7 @@ title: isArabic ? 'إعدادات المزرعة' : 'Farm Settings',
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const FarmSettingsPage(),
+                      builder: (_) => FarmSettingsPage(farm: farm),
                     ),
                   );
                 },
