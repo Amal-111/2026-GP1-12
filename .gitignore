@@ -1,0 +1,47 @@
+# Local environment, credentials and signing material
+.env
+.env.*
+!.env.example
+!.env.*.example
+.secret.local
+.secret.*
+.runtimeconfig.json
+*.service-account.json
+*service-account*.json
+*serviceAccount*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+key.properties
+
+# Dependencies, build output and caches
+node_modules/
+.dart_tool/
+build/
+coverage/
+.gradle/
+*.apk
+*.aab
+/backend/functions/lib/
+
+# Local Firebase Emulator and QA artifacts
+.firebase/
+firebase-export*/
+emulator-data/
+firebase-export-*/
+*-debug.log*
+*.log
+/backend/qa_reports/
+/backend/.rasd-android-*.firebase.json
+/backend/.qafix/
+/backend/.rasd-android-native-qa/
+__pycache__/
+
+# Common credentials and local Flutter development output
+*firebase-adminsdk*.json
+*.pfx
+.widget_preview/
+backend/.secret.local
