@@ -2,7 +2,7 @@ import {onRequest} from 'firebase-functions/v2/https';
 import {timingSafeEqual} from 'node:crypto';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {defineSecret} from 'firebase-functions/params';
-import {db, id} from './common';
+import {db, id, findDevicePalm} from './common';
 
 const gatewayKey = defineSecret('RASD_GATEWAY_KEY');
 const REGION = 'us-central1';
@@ -47,28 +47,22 @@ export const receiveSensorData = onRequest(
       res.status(400).send('Invalid vibrationData'); return;
     }
 
-    // The private monitoringState node is also the compact device-to-palm lookup.
-    // This avoids scanning every farm when a gateway packet arrives.
-    const stateSnap = await db().ref(`monitoringState/${deviceId}`).get();
-    const assignment = stateSnap.val();
-    if (!assignment?.farmId || !assignment?.palmId) {
-      res.status(409).json({error: 'Device not paired or farm unavailable'}); return;
-    }
     const now = Date.now();
     const readingKey = db().ref('farms').push().key!;
     const historyKey = db().ref('farms').push().key!;
     const alertKey = db().ref('farms').push().key!;
 
-    // Prototype consistency: root transaction protects the embedded palm and
-    // the separate monitoringState. Do not deploy before concurrency testing.
+    // Prototype consistency: root transaction protects the embedded palm.
+    // Do not deploy before concurrency testing.
     let applied = false;
     const tx = await db().ref().transaction(root => {
       applied = false;
       // An empty local cache must reach the server's compare-and-swap.
       // A populated server root is returned on conflict and retried.
       if (root === null) return null;
-      const state = root.monitoringState?.[deviceId];
-      if (!state?.farmId || !state?.palmId) return;
+      // Find the palm that this sensor is paired with.
+      const state = findDevicePalm(root, deviceId);
+      if (!state) return;
       const farm = root.farms?.[state.farmId];
       const palm = farm?.palms?.[state.palmId];
       const device = palm?.monitoringDevice;
@@ -85,12 +79,11 @@ export const receiveSensorData = onRequest(
         ...(vibrationData !== undefined ? {vibrationData} : {}),
         detectionResult: {result},
       };
-      const count = state.lastResult === result
-        ? Math.min((state.count ?? 0) + 1, CONFIRMATIONS) : 1;
-      root.monitoringState[deviceId] = {
-        farmId: state.farmId, palmId: state.palmId,
-        lastResult: result, count, lastSeen: now, connectionStatus: 'Online',
-      };
+      // The confirmation streak is stored on the palm's monitoring device.
+      const count = device.lastResult === result
+        ? Math.min((device.count ?? 0) + 1, CONFIRMATIONS) : 1;
+      device.lastResult = result;
+      device.count = count;
       if (count >= CONFIRMATIONS && palm.healthStatus !== result) {
         palm.healthStatus = result as Result;
         palm.monitoringHistory ??= {};
@@ -116,34 +109,33 @@ export const checkOfflineDevices = onSchedule(
   {schedule: 'every 5 minutes', timeZone: 'Etc/UTC', region: REGION},
   async () => {
     const now = Date.now();
-    const onlineSnapshot = await db().ref('monitoringState')
-      .orderByChild('connectionStatus').equalTo('Online').get();
+    // Search every palm's monitoring device for online sensors that stopped sending.
+    const farmsSnapshot = await db().ref('farms').get();
     const candidates: Record<string, string> = {};
-    onlineSnapshot.forEach(child => {
-      const state = child.val();
-      if (child.key && state?.farmId && state?.palmId &&
-          typeof state.lastSeen === 'number' && now - state.lastSeen >= OFFLINE_AFTER_MS) {
-        candidates[child.key] = db().ref('farms').push().key!;
+    for (const farm of Object.values(farmsSnapshot.val() ?? {}) as any[]) {
+      for (const palm of Object.values(farm?.palms ?? {}) as any[]) {
+        const device = palm?.monitoringDevice;
+        if (device?.deviceId && device.connectionStatus === 'Online' &&
+            typeof device.lastSeen === 'number' && now - device.lastSeen >= OFFLINE_AFTER_MS) {
+          candidates[device.deviceId] = db().ref('farms').push().key!;
+        }
       }
-      return false;
-    });
+    }
     if (!Object.keys(candidates).length) return;
     await db().ref().transaction(root => {
       // Let the server retry a cold-cache transaction with the current root.
       if (root === null) return null;
-      if (!root.monitoringState) return;
       let changed = false;
       for (const [deviceId, alertId] of Object.entries(candidates)) {
-        const state = root.monitoringState[deviceId];
-        if (!state || state.connectionStatus !== 'Online' ||
-            typeof state.lastSeen !== 'number' || now - state.lastSeen < OFFLINE_AFTER_MS) continue;
+        const state = findDevicePalm(root, deviceId);
+        if (!state) continue;
         const farm = root.farms?.[state.farmId];
         const palm = farm?.palms?.[state.palmId];
         const device = palm?.monitoringDevice;
         if (!farm || farm.deleting || !palm || palm.deviceId !== deviceId ||
-            device?.deviceId !== deviceId) continue;
+            device?.deviceId !== deviceId || device.connectionStatus !== 'Online' ||
+            typeof device.lastSeen !== 'number' || now - device.lastSeen < OFFLINE_AFTER_MS) continue;
         device.connectionStatus = 'Offline';
-        state.connectionStatus = 'Offline';
         palm.alerts ??= {};
         palm.alerts[alertId] = {palmId: state.palmId, alertType: 'SensorOffline', timestamp: now};
         changed = true;

@@ -1,7 +1,7 @@
 
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {applicationDefault, getApp} from 'firebase-admin/app';
-import {actor, db, object, id, coord, integer, farmAccess} from './common';
+import {actor, db, object, id, coord, integer, farmAccess, findDevicePalm} from './common';
 
 const options = {region: 'us-central1', maxInstances: 10};
 
@@ -182,9 +182,8 @@ export const addPalm = onCall(options, async (request) => {
       throw new HttpsError('permission-denied', 'No access to this farm.');
     }
 
-    const existingDevice = root.monitoringState?.[deviceId];
-
-    if (existingDevice && (existingDevice.farmId || existingDevice.palmId)) {
+    // A sensor can be paired with only one palm.
+    if (findDevicePalm(root, deviceId)) {
       throw new HttpsError(
         'failed-precondition',
         'Unable to add palm: device-already-paired.'
@@ -225,8 +224,6 @@ export const addPalm = onCall(options, async (request) => {
     farm.palms[palmId].monitoringDevice = {
       deviceId, farmId, palmId, connectionStatus: 'Offline',
     };
-    root.monitoringState ??= {};
-    root.monitoringState[deviceId] = {farmId, palmId};
 
     farm.lastPalmNumber = nextNumber;
 
@@ -396,19 +393,10 @@ export const deletePalm = onCall(options, async (request) => {
     );
   }
 
-  const palm = palmSnapshot.val();
-  const deviceId = palm.deviceId;
-
+  // Deleting the palm also removes its sensor pairing and readings.
   const updates: Record<string, unknown> = {
     [`farms/${farmId}/palms/${palmId}`]: null,
   };
-  // Preserve the global internal index while removing the deleted pairing.
-  if (deviceId) {
-    const state = (await db().ref(`monitoringState/${deviceId}`).get()).val();
-    if (state?.farmId === farmId && state?.palmId === palmId) {
-      updates[`monitoringState/${deviceId}`] = null;
-    }
-  }
   await db().ref().update(updates);
 
   return {success: true};

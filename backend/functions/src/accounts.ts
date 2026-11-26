@@ -53,18 +53,6 @@ export const deleteAccount = onCall(options, async request => {
     updates[`farms/${farmId}`] = null;
   }
 
-  // Release internal device-to-palm links for deleted farms.
-  farmsSnapshot.forEach(snapshot => {
-    if (!snapshot.key || !ownedFarms.has(snapshot.key)) return false;
-    const palms = snapshot.val()?.palms ?? {};
-    for (const palm of Object.values(palms) as any[]) {
-      if (typeof palm?.deviceId === 'string') {
-        updates[`monitoringState/${palm.deviceId}`] = null;
-      }
-    }
-    return false;
-  });
-
   // Unassign farmers from deleted farms.
   usersSnapshot.forEach(snapshot => {
     const account = snapshot.val();

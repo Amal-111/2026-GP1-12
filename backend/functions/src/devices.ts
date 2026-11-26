@@ -1,5 +1,5 @@
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
-import {actor, db, farmAccess, id, object} from './common';
+import {actor, db, farmAccess, id, object, findDevicePalm} from './common';
 
 const options = {region: 'us-central1', maxInstances: 10};
 
@@ -28,12 +28,10 @@ export const connectDevice = onCall(options, async (request) => {
          root.users?.[user.uid]?.role === 'Farmer' &&
          root.users[user.uid].farmId === farmId);
     if (!allowed) return;
-    root.monitoringState ??= {};
-    const existing = root.monitoringState[deviceId];
-    if (existing?.farmId || existing?.palmId) return;
+    // A sensor can be paired with only one palm.
+    if (findDevicePalm(root, deviceId)) return;
     palm.monitoringDevice = {deviceId, connectionStatus: 'Offline', farmId, palmId};
     palm.deviceId = deviceId;
-    root.monitoringState[deviceId] = {farmId, palmId};
     paired = true;
     return root;
   }, undefined, false);

@@ -27,9 +27,6 @@
         ".read": "auth != null && (root.child('farms').child($farmId).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === $farmId))"
       }
     },
-    "monitoringState": {
-      ".indexOn": "connectionStatus"
-    },
     "monitoringDevices": {
       "$deviceId": {
         ".read": "auth != null && data.child('farmId').isString() && (root.child('farms').child(data.child('farmId').val()).child('ownerId').val() === auth.uid || (root.child('users').child(auth.uid).child('role').val() === 'Farmer' && root.child('users').child(auth.uid).child('farmId').val() === data.child('farmId').val()))"

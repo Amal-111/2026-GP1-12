@@ -291,15 +291,6 @@ export const deleteFarm = onCall(options, async request => {
   try {
     const usersSnapshot = await db().ref('users').get();
     const updates: DataMap = {[`farms/${farmId}`]: null};
-    // Release only the device pairings under this farm.
-    const palms = asMap(farm.palms) ?? {};
-    for (const palm of Object.values(palms)) {
-      const deviceId = asMap(palm)?.deviceId;
-      if (typeof deviceId === 'string') {
-        const state = (await db().ref(`monitoringState/${deviceId}`).get()).val();
-        if (state?.farmId === farmId) updates[`monitoringState/${deviceId}`] = null;
-      }
-    }
     usersSnapshot.forEach(snapshot => {
       const account = asMap(snapshot.val());
       if (!snapshot.key || !account) return false;
