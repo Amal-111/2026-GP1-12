@@ -22,7 +22,6 @@ All components are powered from the **3.3 V** and **GND** pins of the ESP32-S3.
 | RYLR998 TXD | GPIO 18 (RX) |
 | RYLR998 RXD | GPIO 17 (TX) |
 
-> ⚠️ Connect the LoRa antenna before powering the node.
 
 ## How it works
 
