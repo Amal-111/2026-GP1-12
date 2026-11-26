@@ -15,12 +15,15 @@ The sensor node is attached to the palm trunk. It measures vibrations inside the
 
 All components are powered from the **3.3 V** and **GND** pins of the ESP32-S3.
 
-| Component pin | ESP32-S3 pin |
+| Component pin | Connected to |
 |---|---|
-| MCP602 output (pin 1) | GPIO 4 |
-| DHT22 data | GPIO 5 |
-| RYLR998 TXD | GPIO 18 (RX) |
-| RYLR998 RXD | GPIO 17 (TX) |
+| Piezoelectric disc | MCP602 input (pin 3), through a 10 kΩ resistor |
+| MCP602 output (pin 1) | ESP32-S3 GPIO 4 |
+| DHT22 data | ESP32-S3 GPIO 5 |
+| RYLR998 TXD | ESP32-S3 GPIO 18 (RX) |
+| RYLR998 RXD | ESP32-S3 GPIO 17 (TX) |
+
+The piezo is not connected to the ESP32-S3 directly: its signal first passes through the MCP602 amplifier circuit, which centers it at 1.65 V and amplifies it about 11 times.
 
 
 ## How it works
