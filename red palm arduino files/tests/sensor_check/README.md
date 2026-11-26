@@ -18,4 +18,3 @@ This folder contains small test programs used before building the full sensor no
 2. Open the check program in the Arduino IDE, select the correct board and port, and upload it.
 3. Open the Serial Monitor at 115200 baud and compare the output with the expected result.
 
-> ⚠️ Connect the LoRa antennas before powering the RYLR998 or the Heltec board.
