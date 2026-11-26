@@ -135,3 +135,16 @@ export function optionalFarmImage(v: unknown): string | undefined {
   return s;
 }
 
+
+
+// Find the farm and palm that a sensor is paired with by searching the farms.
+// Used instead of a separate device index (monitoringState).
+export function findDevicePalm(root: any, deviceId: string): {farmId: string; palmId: string} | null {
+  const farms = root?.farms ?? {};
+  for (const [farmId, farm] of Object.entries(farms) as [string, any][]) {
+    for (const [palmId, palm] of Object.entries(farm?.palms ?? {}) as [string, any][]) {
+      if (palm?.deviceId === deviceId) return {farmId, palmId};
+    }
+  }
+  return null;
+}
