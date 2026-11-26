@@ -11,7 +11,7 @@ The code is based on Heltec's LoRaReceiver example and was modified for this pro
 | Gateway (runs this code) | Heltec WiFi LoRa 32 V4 |
 | Sensor node (sends the readings) | ESP32-S3 with REYAX RYLR998, running the sensor node code |
 
-> ⚠️ Connect the antenna before powering the gateway.
+> 
 
 ## How it works
 
