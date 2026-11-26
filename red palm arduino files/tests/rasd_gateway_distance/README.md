@@ -11,7 +11,6 @@ Wi-Fi and backend communication are disabled in this version, so the gateway onl
 | Gateway (runs this code) | Heltec WiFi LoRa 32 V4 |
 | Sensor node (sends the messages) | ESP32-S3 with REYAX RYLR998, running the sensor node code |
 
-> ⚠️ Connect the antennas on both devices before powering them.
 
 ## LoRa settings
 
