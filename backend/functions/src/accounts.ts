@@ -4,17 +4,19 @@ import {actor, db, deleteFarmImages, object, stringField} from './common';
 
 const options = {region: 'us-central1', maxInstances: 10};
 
-// Delete owned farm graph before deleting the Auth identity.
+// Account deletion and cleanup
+
+// Remove owned farms and related records before deleting the Auth identity.
 // RTDB and Auth are separate systems: production still needs retryable cleanup.
 export const deleteAccount = onCall(options, async request => {
   const user = await actor(request);
 
   // Require a recent sign-in before deleting the account.
-  const authTime = request.auth?.token.auth_time;
+  const signInTimeSeconds = request.auth?.token.auth_time;
 
   if (
-    typeof authTime !== 'number' ||
-    Date.now() / 1000 - authTime > 300
+    typeof signInTimeSeconds !== 'number' ||
+    Date.now() / 1000 - signInTimeSeconds > 300
   ) {
     throw new HttpsError(
       'failed-precondition',
@@ -33,56 +35,70 @@ export const deleteAccount = onCall(options, async request => {
     database.ref('users').get(),
   ]);
 
-  const updates: Record<string, unknown> = {};
+  const cleanupUpdates: Record<string, unknown> = {};
 
   const ownedFarmIds: string[] = [];
 
   // Find farms owned by this account.
-  farmsSnapshot.forEach(snapshot => {
-    if (snapshot.val()?.ownerId === user.uid && snapshot.key) {
-      ownedFarmIds.push(snapshot.key);
+  farmsSnapshot.forEach(farmSnapshot => {
+    if (farmSnapshot.val()?.ownerId === user.uid && farmSnapshot.key) {
+      ownedFarmIds.push(farmSnapshot.key);
     }
 
     return false;
   });
 
-  const ownedFarms = new Set(ownedFarmIds);
+  const ownedFarmIdSet = new Set(ownedFarmIds);
 
   // Remove each owned farm and its related records.
   for (const farmId of ownedFarmIds) {
-    updates[`farms/${farmId}`] = null;
+    cleanupUpdates[`farms/${farmId}`] = null;
   }
 
   // Unassign farmers from deleted farms.
-  usersSnapshot.forEach(snapshot => {
-    const account = snapshot.val();
+  usersSnapshot.forEach(profileSnapshot => {
+    const profile = profileSnapshot.val();
+    const profileId = profileSnapshot.key;
 
     if (
-      snapshot.key &&
-      snapshot.key !== user.uid &&
-      account?.role === 'Farmer' &&
-      account?.farmId &&
-      ownedFarms.has(account.farmId)
+      profileId &&
+      profileId !== user.uid &&
+      profile?.role === 'Farmer' &&
+      profile?.farmId &&
+      ownedFarmIdSet.has(profile.farmId)
     ) {
-      updates[`users/${snapshot.key}/farmId`] = null;
+      cleanupUpdates[`users/${profileId}/farmId`] = null;
     }
 
     return false;
   });
 
-  // Embedded invitations belong to each invited user.
-  usersSnapshot.forEach(snapshot => {
-    if (!snapshot.key) return false;
-    const invitations = snapshot.val()?.farmInvitations ?? {};
-    for (const [inviteId, invitation] of Object.entries(invitations) as [string, any][]) {
-      if (snapshot.key === user.uid || invitation?.farmerId === user.uid || ownedFarms.has(invitation?.farmId)) {
-        updates[`users/${snapshot.key}/farmInvitations/${inviteId}`] = null;
+  // Clean up both the recipient's invitations and the owner's sent list.
+  usersSnapshot.forEach(profileSnapshot => {
+    const profileId = profileSnapshot.key;
+    if (!profileId) {
+      return false;
+    }
+
+    const receivedInvitations = profileSnapshot.val()?.farmInvitations ?? {};
+    for (const [invitationId, invitation] of Object.entries(receivedInvitations) as [string, any][]) {
+      if (
+        profileId === user.uid ||
+        invitation?.farmerId === user.uid ||
+        ownedFarmIdSet.has(invitation?.farmId)
+      ) {
+        cleanupUpdates[`users/${profileId}/farmInvitations/${invitationId}`] = null;
       }
     }
-    const sent = snapshot.val()?.sentFarmInvitations ?? {};
-    for (const [inviteId, invitation] of Object.entries(sent) as [string, any][]) {
-      if (snapshot.key === user.uid || invitation?.farmerId === user.uid || ownedFarms.has(invitation?.farmId)) {
-        updates[`users/${snapshot.key}/sentFarmInvitations/${inviteId}`] = null;
+
+    const sentInvitations = profileSnapshot.val()?.sentFarmInvitations ?? {};
+    for (const [invitationId, invitation] of Object.entries(sentInvitations) as [string, any][]) {
+      if (
+        profileId === user.uid ||
+        invitation?.farmerId === user.uid ||
+        ownedFarmIdSet.has(invitation?.farmId)
+      ) {
+        cleanupUpdates[`users/${profileId}/sentFarmInvitations/${invitationId}`] = null;
       }
     }
     return false;
@@ -94,8 +110,8 @@ export const deleteAccount = onCall(options, async request => {
     }
 
     // Clean up related data, but preserve the user's profile.
-    if (Object.keys(updates).length > 0) {
-      await database.ref().update(updates);
+    if (Object.keys(cleanupUpdates).length > 0) {
+      await database.ref().update(cleanupUpdates);
     }
 
     // Delete Authentication after database cleanup succeeds.
@@ -120,53 +136,90 @@ export const deleteAccount = onCall(options, async request => {
   }
 });
 
+// Profile registration and updates
 
-// A signed-in Firebase Auth user may create their profile exactly once.
-// Role and farmId are immutable to clients after registration.
+// Create one profile for a signed-in user with a verified email.
 export const registerProfile = onCall(options, async request => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in first.');
+  }
+
   const uid = request.auth.uid;
   const data = object(request.data);
-  if (Object.keys(data).some(k => !['fullName', 'phoneNumber', 'role', 'preferredLanguage'].includes(k))) {
+  const allowedFields = ['fullName', 'phoneNumber', 'role', 'preferredLanguage'];
+  if (Object.keys(data).some(field => !allowedFields.includes(field))) {
     throw new HttpsError('invalid-argument', 'Unexpected profile fields.');
   }
   const fullName = stringField(data.fullName, 'fullName', 120);
   const phoneNumber = stringField(data.phoneNumber, 'phoneNumber', 25);
-  if (data.role !== 'FarmOwner' && data.role !== 'Farmer') throw new HttpsError('invalid-argument', 'Invalid role.');
-  if (data.preferredLanguage !== 'ar' && data.preferredLanguage !== 'en') throw new HttpsError('invalid-argument', 'Invalid language.');
+  if (data.role !== 'FarmOwner' && data.role !== 'Farmer') {
+    throw new HttpsError('invalid-argument', 'Invalid role.');
+  }
+  if (data.preferredLanguage !== 'ar' && data.preferredLanguage !== 'en') {
+    throw new HttpsError('invalid-argument', 'Invalid language.');
+  }
+
   const authUser = await getAuth().getUser(uid);
-  if (!authUser.email || !authUser.emailVerified) throw new HttpsError('failed-precondition', 'Verified email required.');
-  const profile = {fullName, phoneNumber, role: data.role, preferredLanguage: data.preferredLanguage,
-    email: authUser.email, notificationsEnabled: true};
-  const tx = await db().ref(`users/${uid}`).transaction(current => current ? undefined : profile, undefined, false);
-  if (!tx.committed) throw new HttpsError('already-exists', 'Profile already exists.');
+  if (!authUser.email || !authUser.emailVerified) {
+    throw new HttpsError('failed-precondition', 'Verified email required.');
+  }
+
+  const profile = {
+    fullName,
+    phoneNumber,
+    role: data.role,
+    preferredLanguage: data.preferredLanguage,
+    email: authUser.email,
+    notificationsEnabled: true,
+  };
+
+  // Check for an existing profile in the same transaction that creates it.
+  const profileTransaction = await db().ref(`users/${uid}`).transaction(currentProfile => {
+    if (currentProfile) {
+      return undefined;
+    }
+    return profile;
+  }, undefined, false);
+  if (!profileTransaction.committed) {
+    throw new HttpsError('already-exists', 'Profile already exists.');
+  }
   return {success: true};
 });
 
+// Update editable profile fields without accepting role or farm assignment changes.
 export const updateProfile = onCall(options, async request => {
   const user = await actor(request);
   const data = object(request.data);
-  const allowed = ['fullName', 'phoneNumber', 'preferredLanguage', 'notificationsEnabled'];
-  if (!Object.keys(data).length || Object.keys(data).some(k => !allowed.includes(k))) {
+  const allowedFields = ['fullName', 'phoneNumber', 'preferredLanguage', 'notificationsEnabled'];
+  const requestedFields = Object.keys(data);
+  if (requestedFields.length === 0 || requestedFields.some(field => !allowedFields.includes(field))) {
     throw new HttpsError('invalid-argument', 'Invalid profile changes.');
   }
-  const patch: Record<string, unknown> = {};
-  if ('fullName' in data) patch.fullName = stringField(data.fullName, 'fullName', 120);
-  if ('phoneNumber' in data) patch.phoneNumber = stringField(data.phoneNumber, 'phoneNumber', 25);
+  const profileUpdates: Record<string, unknown> = {};
+  if ('fullName' in data) {
+    profileUpdates.fullName = stringField(data.fullName, 'fullName', 120);
+  }
+  if ('phoneNumber' in data) {
+    profileUpdates.phoneNumber = stringField(data.phoneNumber, 'phoneNumber', 25);
+  }
   if ('preferredLanguage' in data) {
-    if (data.preferredLanguage !== 'ar' && data.preferredLanguage !== 'en') throw new HttpsError('invalid-argument', 'Invalid language.');
-    patch.preferredLanguage = data.preferredLanguage;
+    if (data.preferredLanguage !== 'ar' && data.preferredLanguage !== 'en') {
+      throw new HttpsError('invalid-argument', 'Invalid language.');
+    }
+    profileUpdates.preferredLanguage = data.preferredLanguage;
   }
   if ('notificationsEnabled' in data) {
-    if (typeof data.notificationsEnabled !== 'boolean') throw new HttpsError('invalid-argument', 'Invalid notification setting.');
-    patch.notificationsEnabled = data.notificationsEnabled;
+    if (typeof data.notificationsEnabled !== 'boolean') {
+      throw new HttpsError('invalid-argument', 'Invalid notification setting.');
+    }
+    profileUpdates.notificationsEnabled = data.notificationsEnabled;
   }
-  await db().ref(`users/${user.uid}`).update(patch);
+  await db().ref(`users/${user.uid}`).update(profileUpdates);
   return {success: true};
 });
 
+// Copy the signed-in user's verified email from Firebase Authentication.
 export const syncVerifiedEmail = onCall(options, async request => {
-  // Only the signed-in user can sync their own email.
   const user = await actor(request);
 
   // Read the email directly from Firebase Authentication.
@@ -190,8 +243,9 @@ export const syncVerifiedEmail = onCall(options, async request => {
   };
 });
 
+// Farm assignment
 
-
+// Return the assigned farm's name when the farm is available.
 export const getMyAssignedFarm = onCall(options, async (request) => {
   const user = await actor(request);
 
@@ -202,8 +256,8 @@ export const getMyAssignedFarm = onCall(options, async (request) => {
     );
   }
 
-  const userSnapshot = await db().ref(`users/${user.uid}`).get();
-  const farmer = userSnapshot.val();
+  const farmerSnapshot = await db().ref(`users/${user.uid}`).get();
+  const farmer = farmerSnapshot.val();
 
   if (!farmer || !farmer.farmId) {
     return {farmName: null};

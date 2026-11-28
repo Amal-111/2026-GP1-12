@@ -1,4 +1,3 @@
-
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {
   actor,
@@ -187,56 +186,77 @@ export const updateFarm = onCall(options, async request => {
   }
 
   const farmRef = db().ref(`farms/${farmId}`);
-  const changesPhoto = 'farmImage' in changes;
-  let previousPhoto: unknown;
-  let cleanupPhoto: Awaited<ReturnType<typeof prepareFarmPhotoCleanup>>;
-  if (changesPhoto) {
+  const includesPhotoChange = 'farmImage' in changes;
+  let previousPhotoUrl: unknown;
+  let cleanupPreviousPhoto: Awaited<ReturnType<typeof prepareFarmPhotoCleanup>>;
+
+  // Capture the previous photo before updating its database reference.
+  if (includesPhotoChange) {
     const farm = (await farmRef.get()).val();
     if (!farm || farm.ownerId !== user.uid || farm.deleting === true) {
-      throw new HttpsError('permission-denied', 'Farm is unavailable or not owned by this account.');
+      throw new HttpsError(
+        'permission-denied',
+        'Farm is unavailable or not owned by this account.'
+      );
     }
-    previousPhoto = farm.farmImage ?? null;
-    cleanupPhoto = await prepareFarmPhotoCleanup(user.uid, farmId, previousPhoto, changes.farmImage);
+
+    previousPhotoUrl = farm.farmImage ?? null;
+    cleanupPreviousPhoto = await prepareFarmPhotoCleanup(
+      user.uid,
+      farmId,
+      previousPhotoUrl,
+      changes.farmImage
+    );
   }
 
-  let reason: 'unavailable' | 'capacity' | 'photo-changed' | undefined;
-  const tx = await farmRef.transaction(current => {
-    reason = undefined;
+  let rejectionReason: 'unavailable' | 'capacity' | 'photo-changed' | undefined;
+  const transaction = await farmRef.transaction(current => {
+    rejectionReason = undefined;
     const farm = asMap(current);
     if (!farm || farm.ownerId !== user.uid || farm.deleting === true) {
-      reason = 'unavailable';
+      rejectionReason = 'unavailable';
       // Allow the conditional write to resolve a cold-cache null.
       return current === null ? null : undefined;
     }
+
+    // Count palms in the transaction so concurrent additions are included.
     const registeredPalms = Object.keys(asMap(farm.palms) ?? {}).length;
     if ('totalPalms' in changes && changes.totalPalms < registeredPalms) {
-      reason = 'capacity';
+      rejectionReason = 'capacity';
       // Let the server verify this snapshot and retry if the palm count changed.
       return farm;
     }
-    if (changesPhoto && (farm.farmImage ?? null) !== previousPhoto) {
-      reason = 'photo-changed';
+
+    // Abort if another update changed the photo after cleanup was prepared.
+    if (includesPhotoChange && (farm.farmImage ?? null) !== previousPhotoUrl) {
+      rejectionReason = 'photo-changed';
       return;
     }
+
     return {...farm, ...changes};
   }, undefined, false);
-  if (reason === 'capacity') {
+
+  if (rejectionReason === 'capacity') {
     throw new HttpsError(
       'failed-precondition',
       'Farm capacity cannot be less than registered palms.'
     );
   }
-  if (reason === 'photo-changed') {
-    throw new HttpsError('aborted', 'The farm photo changed. Reopen Farm Settings and retry.');
+  if (rejectionReason === 'photo-changed') {
+    throw new HttpsError(
+      'aborted',
+      'The farm photo changed. Reopen Farm Settings and retry.'
+    );
   }
-  if (!tx.committed || reason === 'unavailable') {
+  if (!transaction.committed || rejectionReason === 'unavailable') {
     throw new HttpsError(
       'permission-denied',
       'Farm is unavailable or not owned by this account.'
     );
   }
 
-  await cleanupPhoto?.();
+  // Delete the previous image only after its reference has been updated.
+  await cleanupPreviousPhoto?.();
   return {
     success: true,
   };
@@ -279,7 +299,6 @@ export const deleteFarm = onCall(options, async request => {
     );
   }
 
- 
   // Allow retrying an incomplete farm deletion.
   if (farm.deleting !== true) {
     await farmRef.update({
@@ -287,16 +306,19 @@ export const deleteFarm = onCall(options, async request => {
     });
   }
 
-
   try {
     const usersSnapshot = await db().ref('users').get();
     const updates: DataMap = {[`farms/${farmId}`]: null};
     usersSnapshot.forEach(snapshot => {
       const account = asMap(snapshot.val());
-      if (!snapshot.key || !account) return false;
+      if (!snapshot.key || !account) {
+        return false;
+      }
+
       if (account.role === 'Farmer' && account.farmId === farmId) {
         updates[`users/${snapshot.key}/farmId`] = null;
       }
+
       const invitations = asMap(account.farmInvitations) ?? {};
       for (const [inviteId, invite] of Object.entries(invitations)) {
         if (asMap(invite)?.farmId === farmId) {
@@ -317,7 +339,6 @@ export const deleteFarm = onCall(options, async request => {
 
     // Apply all cleanup changes in one database update.
     await db().ref().update(updates);
-
 
     return {
       success: true,

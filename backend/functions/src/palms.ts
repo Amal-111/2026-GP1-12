@@ -1,23 +1,22 @@
-
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {applicationDefault, getApp} from 'firebase-admin/app';
 import {actor, db, object, id, coord, integer, farmAccess, findDevicePalm} from './common';
 
 const options = {region: 'us-central1', maxInstances: 10};
 
-const TYPES = ['Sukkari', 'Khalas', 'Ajwa', 'Barhi'];
+const PALM_TYPES = ['Sukkari', 'Khalas', 'Ajwa', 'Barhi'];
 
 // Validate palm fields.
 // Notes are not part of the palm data model.
 function palmFields(
-  d: Record<string, unknown>,
+  palmInput: Record<string, unknown>,
   partial: boolean
 ): Record<string, unknown> {
   const allowed = ['palmType', 'age', 'latitude', 'longitude'];
 
   if (
-    Object.keys(d).some((key) => !allowed.includes(key)) ||
-    (partial && Object.keys(d).length === 0)
+    Object.keys(palmInput).some((key) => !allowed.includes(key)) ||
+    (partial && Object.keys(palmInput).length === 0)
   ) {
     throw new HttpsError(
       'invalid-argument',
@@ -27,33 +26,33 @@ function palmFields(
 
   const result: Record<string, unknown> = {};
 
-  if (!partial || 'palmType' in d) {
-    if (!TYPES.includes(d.palmType as string)) {
+  if (!partial || 'palmType' in palmInput) {
+    if (!PALM_TYPES.includes(palmInput.palmType as string)) {
       throw new HttpsError(
         'invalid-argument',
         'Invalid palmType.'
       );
     }
 
-    result.palmType = d.palmType;
+    result.palmType = palmInput.palmType;
   }
 
-  if (!partial || 'age' in d) {
-    result.age = integer(d.age, 'age', 0, 300);
+  if (!partial || 'age' in palmInput) {
+    result.age = integer(palmInput.age, 'age', 0, 300);
   }
 
-  if (!partial || 'latitude' in d) {
+  if (!partial || 'latitude' in palmInput) {
     result.latitude = coord(
-      d.latitude,
+      palmInput.latitude,
       'latitude',
       -90,
       90
     );
   }
 
-  if (!partial || 'longitude' in d) {
+  if (!partial || 'longitude' in palmInput) {
     result.longitude = coord(
-      d.longitude,
+      palmInput.longitude,
       'longitude',
       -180,
       180
@@ -115,11 +114,12 @@ async function waitAfterConflict(attempt: number): Promise<void> {
 // Add a new palm and pair its sensor.
 export const addPalm = onCall(options, async (request) => {
   const user = await actor(request);
-  const d = object(request.data);
+  const data = object(request.data);
 
-  const farmId = id(d.farmId, 'farmId');
-  const deviceId = id(d.deviceId, 'deviceId');
-  const fields = palmFields(object(d.palm), false);
+  const farmId = id(data.farmId, 'farmId');
+  const deviceId = id(data.deviceId, 'deviceId');
+  const palmInput = object(data.palm);
+  const validatedPalmFields = palmFields(palmInput, false);
 
   await farmAccess(user.uid, user.role, farmId, user.farmId);
 
@@ -134,9 +134,9 @@ export const addPalm = onCall(options, async (request) => {
     ? {Authorization: 'Bearer owner'}
     : {Authorization: `Bearer ${token}`};
 
-  // Retry with fresh data when any concurrent database write occurs.
+  // Read the root and its ETag together so the write can detect any intervening change.
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const response = await requestWithTimeout(endpoint, {
+    const readResponse = await requestWithTimeout(endpoint, {
       method: 'GET',
       headers: {
         ...authHeaders,
@@ -144,17 +144,17 @@ export const addPalm = onCall(options, async (request) => {
       },
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
+    if (!readResponse.ok) {
+      const errorBody = await readResponse.text();
       console.error('addPalm REST read failed', {
-        status: response.status,
+        status: readResponse.status,
         error: errorBody,
       });
       throw new HttpsError('internal', 'Unable to read palm data.');
     }
 
-    const etag = response.headers.get('etag');
-    const root = await response.json() as DatabaseRoot | null;
+    const etag = readResponse.headers.get('etag');
+    const root = await readResponse.json() as DatabaseRoot | null;
 
     if (!etag || !root) {
       throw new HttpsError('failed-precondition', 'Database is empty or unavailable.');
@@ -170,19 +170,22 @@ export const addPalm = onCall(options, async (request) => {
       throw new HttpsError('failed-precondition', 'Unable to add palm: farm-deleting.');
     }
 
-    // Recheck access against the current snapshot, not a previous one.
-    const currentUser = root.users?.[user.uid];
-    const hasAccess = user.role === 'FarmOwner'
-      ? (currentUser?.role === 'FarmOwner' && farm.ownerId === user.uid)
-      : (user.role === 'Farmer' &&
-          currentUser?.role === 'Farmer' &&
-          currentUser.farmId === farmId);
+    // Recheck ownership or assignment against the same snapshot used for the write.
+    const currentProfile = root.users?.[user.uid];
+    const stillOwnsFarm =
+      user.role === 'FarmOwner' &&
+      currentProfile?.role === 'FarmOwner' &&
+      farm.ownerId === user.uid;
+    const stillAssignedToFarm =
+      user.role === 'Farmer' &&
+      currentProfile?.role === 'Farmer' &&
+      currentProfile.farmId === farmId;
 
-    if (!hasAccess) {
+    if (!stillOwnsFarm && !stillAssignedToFarm) {
       throw new HttpsError('permission-denied', 'No access to this farm.');
     }
 
-    // A sensor can be paired with only one palm.
+    // Check all farms because a sensor can be paired with only one palm.
     if (findDevicePalm(root, deviceId)) {
       throw new HttpsError(
         'failed-precondition',
@@ -190,24 +193,25 @@ export const addPalm = onCall(options, async (request) => {
       );
     }
 
-    const registeredPalms = Object.keys(farm.palms ?? {}).length;
+    // Compare the current number of palms with the capacity in this snapshot.
+    const registeredPalmCount = Object.keys(farm.palms ?? {}).length;
     const capacity = farm.totalPalms;
 
     if (!Number.isSafeInteger(capacity) || capacity <= 0) {
       throw new HttpsError('failed-precondition', 'Unable to add palm: invalid-farm-capacity.');
     }
 
-    if (registeredPalms >= capacity) {
+    if (registeredPalmCount >= capacity) {
       throw new HttpsError('failed-precondition', 'Unable to add palm: farm-full.');
     }
 
-    const nextNumber = (farm.lastPalmNumber ?? 0) + 1;
+    const candidatePalmNumber = (farm.lastPalmNumber ?? 0) + 1;
 
-    if (!Number.isSafeInteger(nextNumber) || nextNumber <= 0) {
+    if (!Number.isSafeInteger(candidatePalmNumber) || candidatePalmNumber <= 0) {
       throw new HttpsError('failed-precondition', 'Unable to add palm: invalid-palm-counter.');
     }
 
-    const palmId = `P${String(nextNumber).padStart(3, '0')}`;
+    const palmId = `P${String(candidatePalmNumber).padStart(3, '0')}`;
 
     if (farm.palms?.[palmId]) {
       throw new HttpsError('failed-precondition', 'Unable to add palm: palm-id-conflict.');
@@ -216,18 +220,21 @@ export const addPalm = onCall(options, async (request) => {
     // Prepare all linked changes in the same conditional write.
     farm.palms ??= {};
     farm.palms[palmId] = {
-      ...fields,
+      ...validatedPalmFields,
       deviceId,
       healthStatus: 'Healthy',
     };
 
     farm.palms[palmId].monitoringDevice = {
-      deviceId, farmId, palmId, connectionStatus: 'Offline',
+      deviceId,
+      farmId,
+      palmId,
+      connectionStatus: 'Offline',
     };
 
-    farm.lastPalmNumber = nextNumber;
+    farm.lastPalmNumber = candidatePalmNumber;
 
-    // A changed ETag rejects the entire write (HTTP 412).
+    // Commit all changes only if the ETag still matches the root snapshot.
     const writeResponse = await requestWithTimeout(endpoint, {
       method: 'PUT',
       headers: {
@@ -243,6 +250,7 @@ export const addPalm = onCall(options, async (request) => {
       return {success: true, palmId};
     }
 
+    // A concurrent write changed the root. Read it again before retrying.
     if (writeResponse.status === 412) {
       if (attempt + 1 < MAX_RETRIES) {
         await waitAfterConflict(attempt);
@@ -267,10 +275,10 @@ export const addPalm = onCall(options, async (request) => {
 // Update palm age and type only.
 export const updatePalm = onCall(options, async (request) => {
   const user = await actor(request);
-  const d = object(request.data);
+  const data = object(request.data);
 
-  const farmId = id(d.farmId, 'farmId');
-  const palmId = id(d.palmId, 'palmId');
+  const farmId = id(data.farmId, 'farmId');
+  const palmId = id(data.palmId, 'palmId');
 
   await farmAccess(
     user.uid,
@@ -280,7 +288,7 @@ export const updatePalm = onCall(options, async (request) => {
     true
   );
 
-  const changes = object(d.changes);
+  const changes = object(data.changes);
   const allowed = ['age', 'palmType'];
 
   if (
@@ -307,7 +315,7 @@ export const updatePalm = onCall(options, async (request) => {
   }
 
   if ('palmType' in changes) {
-    if (!TYPES.includes(changes.palmType as string)) {
+    if (!PALM_TYPES.includes(changes.palmType as string)) {
       throw new HttpsError(
         'invalid-argument',
         'Invalid palmType.'
@@ -335,13 +343,17 @@ export const updatePalm = onCall(options, async (request) => {
     `farms/${farmId}/palms/${palmId}`
   );
 
-  const tx = await palmRef.transaction(current => {
+  const transaction = await palmRef.transaction(current => {
     // A cold cache may be empty. A server-confirmed null is a no-op.
-    if (current === null) return null;
-    if (typeof current !== 'object' || Array.isArray(current)) return;
+    if (current === null) {
+      return null;
+    }
+    if (typeof current !== 'object' || Array.isArray(current)) {
+      return;
+    }
     return {...current, ...patch};
   }, undefined, false);
-  if (!tx.committed || !tx.snapshot.exists()) {
+  if (!transaction.committed || !transaction.snapshot.exists()) {
     throw new HttpsError(
       'not-found',
       'Palm not found.'
@@ -352,7 +364,6 @@ export const updatePalm = onCall(options, async (request) => {
 });
 
 // Delete a palm and release its sensor.
-
 export const deletePalm = onCall(options, async (request) => {
   const user = await actor(request);
   const data = object(request.data);
