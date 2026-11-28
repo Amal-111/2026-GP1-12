@@ -174,17 +174,20 @@ class _PalmListPageState extends State<PalmListPage> {
   }
 
   /// Opens the Add Palm flow and refreshes the list afterwards.
-  Future<void> _addPalm() async {
+    Future<void> _addPalm() async {
     try {
-      await Navigator.push<bool>(
+      final added = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (_) => const AddPalmPage(),
         ),
       );
 
-      // No manual refresh is needed.
-      // Firebase onValue updates the list automatically.
+      // The list refreshes by itself (Firebase onValue).
+      // Show the success message when a palm was added.
+      if (added == true && mounted) {
+        showCenterMessage(context, 'Palm tree added successfully.');
+      }
     } catch (error) {
       if (!mounted) return;
 
