@@ -8,6 +8,7 @@ import '../manage_palms/add_palm_page.dart';
 import 'palm_details.dart';
 import '../services/rasd_errors.dart';
 import '../data/auth_store.dart';
+import '../theme/glass_widgets.dart';
 /// Palm list page.
 class PalmListPage extends StatefulWidget {
   final String farmId;
